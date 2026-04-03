@@ -146,7 +146,7 @@ public class BingoPlayer {
 				{
 					ItemMeta im = cur.getItemMeta();
 					im.setDisplayName(ChatColor.RESET + "" + ChatColor.GOLD + "Completed/Unavailable");
-					im.addEnchant(Enchantment.ARROW_INFINITE, 1, true);
+					im.addEnchant(Enchantment.INFINITY, 1, true);
 					im.addItemFlags(ItemFlag.HIDE_ENCHANTS);
 					cur.setItemMeta(im);
 				}
@@ -178,7 +178,7 @@ public class BingoPlayer {
 			ItemStack temp = new ItemStack(Material.DEBUG_STICK);
 			ItemMeta im = temp.getItemMeta();
 			im.setDisplayName(ChatColor.RESET + "" + ChatColor.GOLD + "Change display mode");
-			im.addEnchant(Enchantment.ARROW_INFINITE, 1, true);
+			im.addEnchant(Enchantment.INFINITY, 1, true);
 			im.addItemFlags(ItemFlag.HIDE_ENCHANTS);
 			temp.setItemMeta(im);
 			inv.setItem(8, temp);
@@ -199,7 +199,7 @@ public class BingoPlayer {
 			ItemStack temp = new ItemStack(material);
 			ItemMeta im = temp.getItemMeta();
 			im.setDisplayName(ChatColor.RESET + "" + ChatColor.GOLD + name);
-			im.addEnchant(Enchantment.ARROW_INFINITE, 1, true);
+			im.addEnchant(Enchantment.INFINITY, 1, true);
 			im.addItemFlags(ItemFlag.HIDE_ENCHANTS);
 			temp.setItemMeta(im);
 			inv.setItem(17, temp);

@@ -146,16 +146,16 @@ public class Main extends JavaPlugin implements Listener {
 
 		playerInv = new ItemStack[41];
 		playerInv[0] = new ItemStack(Material.NETHERITE_AXE, 1);
-		playerInv[0].addUnsafeEnchantment(Enchantment.DAMAGE_ALL, 5);
-		playerInv[0].addUnsafeEnchantment(Enchantment.LOOT_BONUS_MOBS, 3);
-		playerInv[0].addUnsafeEnchantment(Enchantment.DIG_SPEED, 5);
+		playerInv[0].addUnsafeEnchantment(Enchantment.SHARPNESS, 5);
+		playerInv[0].addUnsafeEnchantment(Enchantment.LOOTING, 3);
+		playerInv[0].addUnsafeEnchantment(Enchantment.EFFICIENCY, 5);
 		formatItemName(playerInv[0], "Potato Axe");
 		playerInv[1] = new ItemStack(Material.NETHERITE_PICKAXE, 1);
-		playerInv[1].addUnsafeEnchantment(Enchantment.DIG_SPEED, 5);
-		playerInv[1].addUnsafeEnchantment(Enchantment.LOOT_BONUS_BLOCKS, 3);
+		playerInv[1].addUnsafeEnchantment(Enchantment.EFFICIENCY, 5);
+		playerInv[1].addUnsafeEnchantment(Enchantment.FORTUNE, 3);
 		formatItemName(playerInv[1], "Potato Pickaxe");
 		playerInv[2] = new ItemStack(Material.NETHERITE_SHOVEL, 1);
-		playerInv[2].addUnsafeEnchantment(Enchantment.DIG_SPEED, 5);
+		playerInv[2].addUnsafeEnchantment(Enchantment.EFFICIENCY, 5);
 		playerInv[2].addUnsafeEnchantment(Enchantment.SILK_TOUCH, 1);
 		formatItemName(playerInv[2], "Potato Shovel");
 		playerInv[3] = new ItemStack(Material.COOKED_PORKCHOP, 64);
@@ -165,7 +165,7 @@ public class Main extends JavaPlugin implements Listener {
 		playerInv[36].addUnsafeEnchantment(Enchantment.DEPTH_STRIDER, 3);
 		formatItemName(playerInv[36], "Potato Boots");
 		playerInv[39] = new ItemStack(Material.LEATHER_HELMET, 1);
-		playerInv[39].addUnsafeEnchantment(Enchantment.WATER_WORKER, 1);
+		playerInv[39].addUnsafeEnchantment(Enchantment.AQUA_AFFINITY, 1);
 		formatItemName(playerInv[39], "Potato Helmet");
 		{
 			int makeUnbreakable[] = { 0, 1, 2, 36, 39 };
@@ -299,7 +299,7 @@ public class Main extends JavaPlugin implements Listener {
 		bingoCard = new ItemStack(Material.PAPER);
 		ItemMeta im = bingoCard.getItemMeta();
 		im.setDisplayName(ChatColor.GOLD + "" + ChatColor.BOLD + "Bingo Card");
-		im.addEnchant(Enchantment.ARROW_INFINITE, 1, true);
+		im.addEnchant(Enchantment.INFINITY, 1, true);
 		im.addItemFlags(ItemFlag.HIDE_ENCHANTS);
 		bingoCard.setItemMeta(im);
 	}
@@ -1154,7 +1154,7 @@ public class Main extends JavaPlugin implements Listener {
 							|| dc == DamageCause.HOT_FLOOR || dc == DamageCause.LAVA || dc == DamageCause.MELTING)) {
 						p.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 20 * 20, 0, false, false));
 					}
-					p.addPotionEffect(new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, 20 * 10, 127, false, false));
+					p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 20 * 10, 127, false, false));
 
 					if (returnItemsOnDeath) {
 						bplayer.player.getInventory().setContents(playerInv);
