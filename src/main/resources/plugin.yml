@@ -2,7 +2,8 @@ name: PotatoBingo
 version: 1.0
 author: _FuriousPotato_
 main: me._furiouspotato_.bingo.Main
-api-version: 1.13
-commands:
-   bingo:
-      description: Main command to control the game.
+api-version: '1.21'
+permissions:
+  bingo.operator:
+    description: Allows using admin-level bingo commands.
+    default: op

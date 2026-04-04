@@ -1,403 +1,304 @@
 package me._furiouspotato_.bingo.commands;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
 
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.World;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.util.Vector;
-
-import me._furiouspotato_.bingo.BingoPlayer;
-import me._furiouspotato_.bingo.Main;
-
-public class BingoCommand implements CommandExecutor {
-	private Main plugin;
-
-	public BingoCommand(Main plugin) {
-		this.plugin = plugin;
-	}
-
-	List<String> getBingoPlayersNames() {
-		List<String> res = new ArrayList<String>();
-
-		for (Map.Entry<String, BingoPlayer> entry : plugin.players.entrySet()) {
-			BingoPlayer bplayer = entry.getValue();
-			res.add(bplayer.player.getName());
-		}
-
-		return res;
-	}
-
-	@Override
-	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-		if (sender instanceof Player) {
-			Player player = (Player) sender;
-
-			if (args.length == 0 || args.length == 1 && args[0].equalsIgnoreCase("help")) {
-				sender.sendMessage(ChatColor.GOLD + "The bingo command help menu:");
-				sender.sendMessage(ChatColor.DARK_AQUA + "/bingo setup [mode]" + ChatColor.GOLD
-						+ " - setup a new game with the given game mode.");
-				sender.sendMessage(ChatColor.DARK_AQUA + "/bingo join [player]" + ChatColor.GOLD
-						+ " - join the current game or force player to join.");
-				sender.sendMessage(ChatColor.DARK_AQUA + "/bingo leave [player]" + ChatColor.GOLD
-						+ " - leave the current game or force player to leave.");
-				sender.sendMessage(ChatColor.DARK_AQUA + "/bingo start" + ChatColor.GOLD + " - start a new game.");
-				sender.sendMessage(ChatColor.DARK_AQUA + "/bingo quickstart" + ChatColor.GOLD
-						+ " - start a new game with all online players without setting it up first.");
-				sender.sendMessage(ChatColor.DARK_AQUA + "/bingo end" + ChatColor.GOLD + " - end the current game.");
-				sender.sendMessage(ChatColor.DARK_AQUA + "/bingo list" + ChatColor.GOLD
-						+ " - show the list of all the players in the current game.");
-				sender.sendMessage(ChatColor.DARK_AQUA + "/bingo returncard" + ChatColor.GOLD
-						+ " - return the Bingo Card if lost.");
-				return false;
-			}
-
-			if (args[0].equalsIgnoreCase("setup")) {
-				if (1 <= args.length && args.length <= 3) {
-					if (player.hasPermission("bingo.operator")) {
-						if (plugin.gameStatus != -1) {
-							sender.sendMessage(ChatColor.RED + "The game is already running!");
-
-							return false;
-						}
-
-						String mode = "default", difficulty = "easy";
-						if (args.length >= 2) {
-							mode = args[1];
-						}
-						if (args.length >= 3) {
-							difficulty = args[2];
-						}
-
-						int result = setupGame(mode, difficulty);
-
-						if (result == 1) {
-							sender.sendMessage(
-									ChatColor.RED + "Failed to start game! Not enough available Bingo items!");
-
-							return false;
-						}
-
-						if (result == 2) {
-							sender.sendMessage(
-									ChatColor.RED + "Failed to start game! No valid Bingo Card combination found!");
-
-							return false;
-						}
-
-						if (result == 0) {
-							return false;
-						}
-					} else {
-						sender.sendMessage(ChatColor.DARK_RED + "You don't have permission!");
-						return true;
-					}
-				}
-			}
-
-			if (args[0].equalsIgnoreCase("join") || args[0].equalsIgnoreCase("leave")) {
-				if (args.length == 1) {
-					if (plugin.gameStatus == -1) {
-						sender.sendMessage(ChatColor.RED + "The game has not been started yet.");
-
-						return false;
-					}
-					if (args[0].equalsIgnoreCase("join")) {
-						plugin.addPlayer(player.getName());
-					} else {
-						plugin.removePlayer(player.getName());
-					}
-
-					return false;
-				} else {
-					if (args.length == 2) {
-						if (player.hasPermission("bingo.operator")) {
-							if (plugin.gameStatus == -1) {
-								sender.sendMessage(ChatColor.RED + "The game has not been started yet.");
-
-								return false;
-							}
-							boolean found = false;
-							if (args[0].equalsIgnoreCase("join")) {
-								for (Player player2 : Bukkit.getOnlinePlayers()) {
-									if (args[1].equalsIgnoreCase("*") || args[1].equalsIgnoreCase(player2.getName())) {
-										if (!plugin.players.containsKey(player2.getName())) {
-											plugin.addPlayer(player2.getName());
-											found = true;
-										}
-										found = true;
-									}
-								}
-							} else {
-								List<String> names = getBingoPlayersNames();
-								for (String name : names) {
-									if (args[1].equalsIgnoreCase("*") || args[1].equalsIgnoreCase(name)) {
-										plugin.removePlayer(name);
-										found = true;
-									}
-								}
-							}
-
-							if (!found) {
-								if (args[0].equalsIgnoreCase("join")) {
-									if (!args[1].equalsIgnoreCase("*")) {
-										sender.sendMessage(ChatColor.RED + "The player " + args[1]
-												+ " is not found or he is already in game!");
-									} else {
-										sender.sendMessage(ChatColor.RED + "There are no players not in game!");
-									}
-								} else {
-									if (!args[1].equalsIgnoreCase("*")) {
-										sender.sendMessage(
-												ChatColor.RED + "The player " + args[1] + " is not in game!");
-									} else {
-										sender.sendMessage(ChatColor.RED + "There are no players in game!");
-									}
-								}
-							}
-
-							return false;
-						} else {
-							sender.sendMessage(ChatColor.DARK_RED + "You don't have permission!");
-							return true;
-						}
-					}
-				}
-			}
-
-			if (args[0].equalsIgnoreCase("start")) {
-				if (args.length == 1) {
-					if (player.hasPermission("bingo.operator")) {
-						if (plugin.gameStatus != 2) {
-							if (plugin.gameStatus == 0) {
-								sender.sendMessage(ChatColor.RED + "The game is already running!");
-							} else {
-								sender.sendMessage(ChatColor.RED + "The game has not been started yet!");
-							}
-
-							return false;
-						}
-
-						plugin.startGame();
-
-						return false;
-					} else {
-						sender.sendMessage(ChatColor.DARK_RED + "You don't have permission!");
-						return true;
-					}
-				}
-			}
-
-			if (args[0].equalsIgnoreCase("quickstart")) {
-				if (1 <= args.length && args.length <= 3) {
-					if (player.hasPermission("bingo.operator")) {
-						if (plugin.gameStatus != -1) {
-							sender.sendMessage(ChatColor.RED + "The game is already running!");
-
-							return false;
-						}
-
-						String mode = "default", difficulty = "easy";
-						if (args.length >= 2) {
-							mode = args[1];
-						}
-						if (args.length >= 3) {
-							difficulty = args[2];
-						}
-
-						int result = setupGame(mode, difficulty);
-
-						if (result == 1) {
-							sender.sendMessage(
-									ChatColor.RED + "Failed to start game! Not enough available Bingo items!");
-
-							return false;
-						}
-
-						if (result == 2) {
-							sender.sendMessage(
-									ChatColor.RED + "Failed to start game! No valid Bingo Card combination found!");
-
-							return false;
-						}
-
-						if (result == 0) {
-							for (Player player2 : Bukkit.getOnlinePlayers()) {
-								if (!plugin.players.containsKey(player2.getName())) {
-									plugin.addPlayer(player2.getName());
-								}
-							}
-
-							plugin.startGame();
-
-							return false;
-						}
-					} else {
-						sender.sendMessage(ChatColor.DARK_RED + "You don't have permission!");
-						return true;
-					}
-				}
-			}
-
-			if (args[0].equalsIgnoreCase("end")) {
-				if (args.length == 1 || args.length == 2
-						&& (args[1].equalsIgnoreCase("false") || args[1].equalsIgnoreCase("true"))) {
-					if (player.hasPermission("bingo.operator")) {
-						if (plugin.gameStatus == -1) {
-							sender.sendMessage(ChatColor.RED + "The game is not running.");
-
-							return false;
-						}
-
-						plugin.endGame(args.length == 1 || args.length == 2 && args[1].equalsIgnoreCase("false"), true);
-
-						return false;
-					} else {
-						sender.sendMessage(ChatColor.DARK_RED + "You don't have permission!");
-						return true;
-					}
-				}
-			}
-
-			if (args[0].equalsIgnoreCase("list")) {
-				if (args.length == 1) {
-					if (plugin.players.isEmpty()) {
-						sender.sendMessage(ChatColor.GOLD + "There are no players in game.");
-					} else {
-						sender.sendMessage(ChatColor.GOLD + "Players in game:");
-						String res = new String();
-						for (Map.Entry<String, BingoPlayer> entry : plugin.players.entrySet()) {
-							res += ChatColor.AQUA + entry.getKey() + ChatColor.GOLD + ", ";
-						}
-						res = res.substring(0, (int) res.length() - 2) + ChatColor.GOLD + ".";
-						sender.sendMessage(ChatColor.GOLD + res);
-					}
-
-					return false;
-				}
-			}
-
-			if (args[0].equalsIgnoreCase("returncard")) {
-				if (args.length == 1) {
-					if (sender instanceof Player && plugin.players.containsKey(sender.getName())) {
-						BingoPlayer bplayer = plugin.players.get(sender.getName());
-						plugin.returnCard(bplayer);
-
-						return false;
-					}
-				}
-			}
-
-			if (args[0].equalsIgnoreCase("reload")) {
-				if (args.length == 1) {
-					if (player.hasPermission("bingo.operator")) {
-						plugin.loadGameRules();
-
-						sender.sendMessage(ChatColor.GOLD + "Successfully reload config.yml file.");
-
-						return false;
-					} else {
-						sender.sendMessage(ChatColor.DARK_RED + "You don't have permission!");
-						return true;
-					}
-				}
-			}
-
-			if (args[0].equalsIgnoreCase("gamerules")) {
-				if (args.length == 2 && Arrays.asList("arcade", "realistic").contains(args[1])) {
-					if (args[1].equalsIgnoreCase("arcade")) {
-						plugin.setArcadeGameRules();
-					} else {
-						plugin.setRealisticGameRules();
-					}
-
-					sender.sendMessage(ChatColor.GOLD + "Successfully changed game rules.");
-
-					return false;
-				}
-			}
-
-			if (args[0].equalsIgnoreCase("setscore")) {
-				if (args.length == 2 || args.length == 3) {
-					if (player.hasPermission("bingo.operator")) {
-						String target = sender.getName();
-						if (args.length == 3)
-							target = args[2];
-
-						boolean found = false;
-						for (Map.Entry<String, Integer> entry : plugin.globalPoints.entrySet()) {
-							if (entry.getKey().equalsIgnoreCase(target) || target.equalsIgnoreCase("*")) {
-								plugin.setGlobalScore(entry.getKey(), Integer.valueOf(args[1]));
-								found = true;
-							}
-						}
-
-						if (found) {
-							sender.sendMessage(ChatColor.GOLD + "Successfully set the score.");
-						} else {
-							sender.sendMessage(ChatColor.RED + "The player " + target + " wasn't found!");
-						}
-
-						return false;
-					} else {
-						sender.sendMessage(ChatColor.DARK_RED + "You don't have permission!");
-						return true;
-					}
-				}
-			}
-
-			if (args[0].equalsIgnoreCase("toggleglobalscore")) {
-				if (player.hasPermission("bingo.operator")) {
-					plugin.toggleGlobalScore();
-
-					sender.sendMessage(ChatColor.GOLD + "Successfully toggled the global score.");
-
-					return false;
-				} else {
-					sender.sendMessage(ChatColor.DARK_RED + "You don't have permission!");
-					return true;
-				}
-			}
-
-			sender.sendMessage(ChatColor.DARK_RED + "Wrong command syntax! Type " + ChatColor.BOLD + "/bingo help"
-					+ ChatColor.RESET + ChatColor.DARK_RED + " for help.");
-
-			return true;
-		}
-
-		return false;
-	}
-
-	int setupGame(String mode, String difficultyString) {
-		int gameType = -1;
-		if (mode.equalsIgnoreCase("default"))
-			gameType = 0;
-		if (mode.equalsIgnoreCase("butfast"))
-			gameType = 1;
-		if (mode.equalsIgnoreCase("collectall"))
-			gameType = 2;
-
-		int difficulty = -1;
-		if (difficultyString.equalsIgnoreCase("baby"))
-			difficulty = 0;
-		if (difficultyString.equalsIgnoreCase("easy"))
-			difficulty = 1;
-		if (difficultyString.equalsIgnoreCase("medium"))
-			difficulty = 2;
-		if (difficultyString.equalsIgnoreCase("hard"))
-			difficulty = 3;
-		if (difficultyString.equalsIgnoreCase("insane"))
-			difficulty = 4;
-
-		int result = plugin.setupGame(gameType, difficulty);
-
-		return result;
-	}
+
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
+import me._furiouspotato_.bingo.model.GameDifficulty;
+import me._furiouspotato_.bingo.model.GameMode;
+import me._furiouspotato_.bingo.model.TeamColor;
+import me._furiouspotato_.bingo.service.GameSessionManager;
+import me._furiouspotato_.bingo.service.ItemPoolService;
+import me._furiouspotato_.bingo.service.RulesConfigService;
+import me._furiouspotato_.bingo.service.TeamManager;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+
+public final class BingoCommand {
+    private static final String ADMIN_PERMISSION = "bingo.operator";
+
+    private final GameSessionManager session;
+    private final RulesConfigService rules;
+    private final ItemPoolService itemPool;
+    private final TeamManager teamManager;
+
+    public BingoCommand(GameSessionManager session, RulesConfigService rules, ItemPoolService itemPool,
+            TeamManager teamManager) {
+        this.session = session;
+        this.rules = rules;
+        this.itemPool = itemPool;
+        this.teamManager = teamManager;
+    }
+
+    public void register(Commands registrar) {
+        registrar.register(
+                Commands.literal("bingo")
+                        .executes(this::runHelp)
+                        .then(Commands.literal("help").executes(this::runHelp))
+                        .then(Commands.literal("join")
+                                .executes(this::runJoinSelfAuto)
+                                .then(Commands.argument("arg", StringArgumentType.word())
+                                        .suggests(this::suggestJoinFirstArg)
+                                        .executes(this::runJoinWithOneArg)
+                                        .then(Commands.argument("player", StringArgumentType.word())
+                                                .suggests(this::suggestPlayers)
+                                                .executes(this::runJoinWithTeamAndPlayer))))
+                        .then(Commands.literal("leave")
+                                .executes(this::runLeaveSelf)
+                                .then(Commands.argument("player", StringArgumentType.word())
+                                        .suggests(this::suggestPlayers)
+                                        .executes(this::runLeavePlayer)))
+                        .then(Commands.literal("list").executes(this::runList))
+                        .then(Commands.literal("start")
+                                .executes(this::runStartDefault)
+                                .then(Commands.argument("targets", ArgumentTypes.players())
+                                        .executes(this::runStartTargets)))
+                        .then(Commands.literal("end").executes(this::runEnd))
+                        .then(Commands.literal("mode")
+                                .then(Commands.argument("mode", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> suggestWords(builder, GameMode.keys()))
+                                        .executes(this::runMode)))
+                        .then(Commands.literal("difficulty")
+                                .then(Commands.argument("difficulty", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> suggestWords(builder, GameDifficulty.keys()))
+                                        .executes(this::runDifficulty)))
+                        .then(Commands.literal("reload").executes(this::runReload))
+                        .build(),
+                "Team Bingo game command.");
+    }
+
+    private int runHelp(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        printHelp(sender(ctx));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runJoinSelfAuto(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSender sender = sender(ctx);
+        boolean admin = isAdmin(sender);
+        Player self = requirePlayer(sender);
+        ensureJoinAllowed(self, admin);
+        session.joinPlayer(self, null);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runJoinWithOneArg(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSender sender = sender(ctx);
+        String arg = StringArgumentType.getString(ctx, "arg");
+        boolean admin = isAdmin(sender);
+
+        TeamColor team = parseTeamOrNull(arg);
+        if (team != null) {
+            Player self = requirePlayer(sender);
+            ensureJoinAllowed(self, admin);
+            session.joinPlayer(self, team);
+            return Command.SINGLE_SUCCESS;
+        }
+
+        requireAdmin(sender);
+        Player target = requireOnlinePlayer(arg);
+        session.joinPlayer(target, null);
+        target.sendMessage("An admin assigned you to a team.");
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runJoinWithTeamAndPlayer(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSender sender = sender(ctx);
+        requireAdmin(sender);
+        TeamColor team = TeamColor.parse(StringArgumentType.getString(ctx, "arg"));
+        Player target = requireOnlinePlayer(StringArgumentType.getString(ctx, "player"));
+        session.joinPlayer(target, team);
+        target.sendMessage(Component.text("An admin assigned you to team ").append(team.displayNameComponent())
+                .append(Component.text(".")));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runLeaveSelf(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSender sender = sender(ctx);
+        boolean admin = isAdmin(sender);
+        Player self = requirePlayer(sender);
+        if (session.isRunning() && !admin) {
+            throw new IllegalStateException("Only admins can modify teams while a game is running.");
+        }
+        session.removePlayer(self);
+        self.sendMessage("You left your team.");
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runLeavePlayer(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSender sender = sender(ctx);
+        requireAdmin(sender);
+        Player target = requireOnlinePlayer(StringArgumentType.getString(ctx, "player"));
+        session.removePlayer(target);
+        target.sendMessage("An admin removed you from the game teams.");
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runStartDefault(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSender sender = sender(ctx);
+        requireAdmin(sender);
+        session.startGame(new ArrayList<>(Bukkit.getOnlinePlayers()));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runStartTargets(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSender sender = sender(ctx);
+        requireAdmin(sender);
+        List<Player> targets = ctx.getArgument("targets", PlayerSelectorArgumentResolver.class)
+                .resolve(ctx.getSource());
+        try {
+            session.startGame(targets);
+        } catch (IllegalStateException | IllegalArgumentException ex) {
+            sender.sendMessage(Component.text(ex.getMessage(), NamedTextColor.RED));
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runEnd(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        requireAdmin(sender(ctx));
+        session.endGame(true);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runList(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSender sender = sender(ctx);
+        String summary = session.participantsSummary();
+        if (summary.isBlank()) {
+            sender.sendMessage("No active team members.");
+            return Command.SINGLE_SUCCESS;
+        }
+        sender.sendMessage("Teams:");
+        sender.sendMessage(summary);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runMode(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSender sender = sender(ctx);
+        requireAdmin(sender);
+        GameMode mode = GameMode.fromKey(StringArgumentType.getString(ctx, "mode"));
+        session.setMode(mode);
+        sender.sendMessage("Default mode set to " + mode.key() + ".");
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runDifficulty(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSender sender = sender(ctx);
+        requireAdmin(sender);
+        GameDifficulty difficulty = GameDifficulty.fromKey(StringArgumentType.getString(ctx, "difficulty"));
+        session.setDifficulty(difficulty);
+        sender.sendMessage("Default difficulty set to " + difficulty.key() + ".");
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runReload(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSender sender = sender(ctx);
+        requireAdmin(sender);
+        rules.load();
+        itemPool.load();
+        sender.sendMessage("Reloaded config and item database.");
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private void ensureJoinAllowed(Player player, boolean admin) {
+        if (session.isRunning() && !admin) {
+            throw new IllegalStateException("Only admins can join/switch teams while the game is running.");
+        }
+    }
+
+    private TeamColor parseTeamOrNull(String value) {
+        try {
+            return TeamColor.parse(value);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private Player requirePlayer(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            throw new IllegalArgumentException("This command requires an in-game player.");
+        }
+        return player;
+    }
+
+    private static Player requireOnlinePlayer(String nickname) {
+        Player player = Bukkit.getPlayerExact(nickname);
+        if (player == null) {
+            throw new IllegalArgumentException("Player not found: " + nickname);
+        }
+        return player;
+    }
+
+    private void printHelp(CommandSender sender) {
+        sender.sendMessage("Bingo commands:");
+        sender.sendMessage("/bingo join - auto-join lowest population team.");
+        sender.sendMessage("/bingo join <team> - join a specific wool-color team.");
+        sender.sendMessage("/bingo list - list non-empty teams.");
+        sender.sendMessage("/bingo start [selector] - start game. Default: @a.");
+        sender.sendMessage("/bingo end - end current game.");
+        sender.sendMessage("/bingo mode <mode> - set game mode.");
+        sender.sendMessage("/bingo difficulty <difficulty> - set game difficulty.");
+        sender.sendMessage(
+                "Admin-only: /bingo join <player>, /bingo join <team> <player>, /bingo leave <player>, /bingo reload");
+    }
+
+    private static boolean isAdmin(CommandSender sender) {
+        return sender.hasPermission(ADMIN_PERMISSION);
+    }
+
+    private static void requireAdmin(CommandSender sender) {
+        if (!isAdmin(sender)) {
+            throw new IllegalArgumentException("You do not have permission.");
+        }
+    }
+
+    private CompletableFuture<Suggestions> suggestJoinFirstArg(CommandContext<CommandSourceStack> ctx,
+            SuggestionsBuilder builder) throws CommandSyntaxException {
+        List<String> options = new ArrayList<>(teamManager.teamNames());
+        CommandSender sender = sender(ctx);
+        if (isAdmin(sender)) {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                options.add(player.getName());
+            }
+        }
+        return suggestWords(builder, options);
+    }
+
+    private CompletableFuture<Suggestions> suggestPlayers(CommandContext<CommandSourceStack> ctx,
+            SuggestionsBuilder builder)
+            throws CommandSyntaxException {
+        List<String> options = new ArrayList<>();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            options.add(player.getName());
+        }
+        return suggestWords(builder, options);
+    }
+
+    private static CompletableFuture<Suggestions> suggestWords(SuggestionsBuilder builder, List<String> words) {
+        String remaining = builder.getRemainingLowerCase();
+        for (String word : words) {
+            if (word.toLowerCase(Locale.ROOT).startsWith(remaining)) {
+                builder.suggest(word);
+            }
+        }
+        return builder.buildFuture();
+    }
+
+    private static CommandSender sender(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        return ctx.getSource().getSender();
+    }
 }
