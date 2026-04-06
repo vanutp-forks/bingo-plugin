@@ -10,6 +10,7 @@ public final class TeamState {
     private final boolean[] collected = new boolean[25];
     private int score = 0;
     private boolean finished = false;
+    private int finishedAtSeconds = -1;
 
     public TeamState(TeamColor color) {
         this.color = color;
@@ -59,11 +60,20 @@ public final class TeamState {
         this.finished = finished;
     }
 
+    public int finishedAtSeconds() {
+        return finishedAtSeconds;
+    }
+
+    public void setFinishedAtSeconds(int finishedAtSeconds) {
+        this.finishedAtSeconds = finishedAtSeconds;
+    }
+
     public void resetRound() {
         for (int i = 0; i < collected.length; i++) {
             collected[i] = false;
         }
         score = 0;
         finished = false;
+        finishedAtSeconds = -1;
     }
 }

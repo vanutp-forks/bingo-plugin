@@ -1,32 +1,79 @@
+# speed boost if holding bingo card
 enable-speed-bonus: true
+# give permanent fire res on round start
 enable-fire-resistance-effect: false
+# give permanent water breathing on round start
 enable-water-breathing-effect: true
+# give permanent night vision on round start
 enable-night-vision-effect: true
+# legacy starter kit on round start
 give-initial-items: true
+# ignore normal fall damage for participants
 prevent-fall-damage: true
+# tp player back to death point after punishment
 teleport-back-on-death: true
+# restore inv/armor/offhand after punishment
 return-items-on-death: true
+# lock bingo card movement/drop/swap
 fix-bingo-card: false
+# show global points in player list
 show-global-score: true
+# manual claim consumes 1 matching item
+consume-on-claim: true
+# arena world name (fallback = first world)
 default-world-name: world
+# pregame countdown in seconds
 countdown-time: 10
+# death punishment duration in seconds
 punishment-time: 10
+# grace period before auto end in seconds
 after-game-time: 10
-default-game-duration:
-   '0': 600
-   '1': 1200
-   '2': 3600
-   '3': 10800
-   '4': 14400
-butfast-game-duration:
-   '0': 300
-   '1': 600
-   '2': 1800
-   '3': 5400
-   '4': 7200
-collectall-game-duration:
-   '0': 900
-   '1': 1800
-   '2': 5400
-   '3': 16200
-   '4': 21600
+# print nodes, recipes, merged buckets and board items on startup
+debug-print-node-graph-on-startup: false
+# board claim mode: auto | manual
+board-claim-mode: auto
+# default bingo mode
+default-mode: default
+# default bingo difficulty key
+default-difficulty: easy
+
+# order = list position
+# target-score = wanted average board cell score
+# max-deviation = allowed +/- spread for cell + average checks
+# durations = round timer per mode in seconds
+difficulty-levels:
+  - key: baby
+    target-score: 8
+    max-deviation: 10
+    durations:
+      default: 600
+      butfast: 300
+      collectall: 900
+  - key: easy
+    target-score: 20
+    max-deviation: 15
+    durations:
+      default: 1200
+      butfast: 600
+      collectall: 1800
+  - key: medium
+    target-score: 50
+    max-deviation: 30
+    durations:
+      default: 3600
+      butfast: 1800
+      collectall: 5400
+  - key: hard
+    target-score: 100
+    max-deviation: 40
+    durations:
+      default: 10800
+      butfast: 5400
+      collectall: 16200
+  - key: insane
+    target-score: 200
+    max-deviation: 80
+    durations:
+      default: 14400
+      butfast: 7200
+      collectall: 21600
