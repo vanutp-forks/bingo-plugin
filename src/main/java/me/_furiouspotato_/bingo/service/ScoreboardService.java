@@ -11,6 +11,7 @@ import org.bukkit.scoreboard.Criteria;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -19,50 +20,64 @@ import me._furiouspotato_.bingo.model.TeamState;
 
 public final class ScoreboardService {
     public void update(GameSessionManager session) {
-        if (!session.isRunning()) {
-            clearAll();
-            if (session.rules().showGlobalScore()) {
-                updateGlobalPoints(session);
-            }
-            return;
-        }
-
         for (Player player : Bukkit.getOnlinePlayers()) {
             Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-            Objective objective = scoreboard.registerNewObjective(
-                    "bingo",
-                    Criteria.DUMMY,
-                    Component.text("Bingo", NamedTextColor.GOLD));
-            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+            applyTeams(scoreboard, session);
 
-            int line = 15;
-            String modeLine = "\u00A76Mode: \u00A7e" + session.mode().key();
-            objective.getScore(trim(modeLine)).setScore(line--);
+            if (session.isRunning()) {
+                Objective objective = scoreboard.registerNewObjective(
+                        "bingo",
+                        Criteria.DUMMY,
+                        Component.text("Bingo", NamedTextColor.GOLD));
+                objective.setDisplaySlot(DisplaySlot.SIDEBAR);
 
-            String timeLine = "\u00A76Time: \u00A7a" + formatTime(session.elapsedSeconds()) + "\u00A76/\u00A7a"
-                    + formatTime(session.finishSeconds());
-            objective.getScore(trim(timeLine)).setScore(line--);
-            objective.getScore("\u00A77 ").setScore(line--);
+                int line = 15;
+                String modeLine = "\u00A76Mode: \u00A7e" + session.mode().key() + "\u00A76 / Diff: \u00A7e"
+                        + session.difficulty().key();
+                objective.getScore(trim(modeLine)).setScore(line--);
 
-            List<TeamState> teams = new ArrayList<>(session.teamManager().activeTeams());
-            teams.sort(teamComparator(session.mode()));
-            for (TeamState state : teams) {
-                String row = formatTeamRow(session, state);
-                objective.getScore(trim(row)).setScore(line--);
-                if (line <= 0) {
-                    break;
+                String timeLine = "\u00A76Time: \u00A7a" + formatTime(session.elapsedSeconds()) + "\u00A76/\u00A7a"
+                        + formatTime(session.finishSeconds());
+                objective.getScore(trim(timeLine)).setScore(line--);
+                objective.getScore("\u00A77 ").setScore(line--);
+
+                List<TeamState> teams = new ArrayList<>(session.visibleTeams());
+                teams.sort(teamComparator(session.mode()));
+                for (TeamState state : teams) {
+                    String row = formatTeamRow(session, state);
+                    objective.getScore(trim(row)).setScore(line--);
+                    if (line <= 0) {
+                        break;
+                    }
                 }
             }
+
+            if (session.rules().showGlobalScore()) {
+                Objective objective = scoreboard.registerNewObjective("bingo_global", Criteria.DUMMY,
+                        Component.text("Global Points", NamedTextColor.GOLD));
+                objective.setDisplaySlot(DisplaySlot.PLAYER_LIST);
+                for (Map.Entry<String, Integer> entry : session.globalPoints().entrySet()) {
+                    objective.getScore(entry.getKey()).setScore(entry.getValue());
+                }
+            }
+
             player.setScoreboard(scoreboard);
-        }
-        if (session.rules().showGlobalScore()) {
-            updateGlobalPoints(session);
         }
     }
 
     public void clearAll() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+        }
+    }
+
+    private static void applyTeams(Scoreboard scoreboard, GameSessionManager session) {
+        for (TeamState state : session.teamManager().activeTeams()) {
+            Team team = scoreboard.registerNewTeam("bingo_" + state.color().name().toLowerCase());
+            team.color(state.color().textColor());
+            for (String member : state.members()) {
+                team.addEntry(member);
+            }
         }
     }
 
@@ -125,24 +140,5 @@ public final class ScoreboardService {
             case YELLOW -> "\u00A7e";
             case WHITE -> "\u00A7f";
         };
-    }
-
-    private static void updateGlobalPoints(GameSessionManager session) {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            Scoreboard scoreboard = player.getScoreboard();
-            if (scoreboard == null) {
-                scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-                player.setScoreboard(scoreboard);
-            }
-            Objective objective = scoreboard.getObjective("bingo_global");
-            if (objective == null) {
-                objective = scoreboard.registerNewObjective("bingo_global", Criteria.DUMMY,
-                        Component.text("Global Points", NamedTextColor.GOLD));
-                objective.setDisplaySlot(DisplaySlot.PLAYER_LIST);
-            }
-            for (Map.Entry<String, Integer> entry : session.globalPoints().entrySet()) {
-                objective.getScore(entry.getKey()).setScore(entry.getValue());
-            }
-        }
     }
 }

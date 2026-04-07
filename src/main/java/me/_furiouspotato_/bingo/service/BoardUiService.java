@@ -20,6 +20,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import me._furiouspotato_.bingo.model.BoardEntry;
+import me._furiouspotato_.bingo.model.GameDifficulty;
 import me._furiouspotato_.bingo.model.GameMode;
 import me._furiouspotato_.bingo.model.TeamState;
 import net.kyori.adventure.text.Component;
@@ -92,20 +93,22 @@ public final class BoardUiService {
     }
 
     public void openBoard(Player player, BoardService.Board board, TeamState team, GameMode mode,
+            GameDifficulty difficulty,
             IntUnaryOperator rewardForIndex) {
         Inventory inventory = Bukkit.createInventory(new BoardViewHolder(), 45,
                 Component.text(BOARD_TITLE, NamedTextColor.GOLD));
-        fillBoard(inventory, player, board, team, mode, rewardForIndex);
+        fillBoard(inventory, player, board, team, mode, difficulty, rewardForIndex);
         player.openInventory(inventory);
     }
 
     public void refreshOpenBoard(Player player, BoardService.Board board, TeamState team, GameMode mode,
+            GameDifficulty difficulty,
             IntUnaryOperator rewardForIndex) {
         Inventory inventory = player.getOpenInventory().getTopInventory();
         if (!isBoardView(inventory.getHolder())) {
             return;
         }
-        fillBoard(inventory, player, board, team, mode, rewardForIndex);
+        fillBoard(inventory, player, board, team, mode, difficulty, rewardForIndex);
         player.updateInventory();
     }
 
@@ -115,7 +118,7 @@ public final class BoardUiService {
 
     public ClickAction mapClick(Player player, int rawSlot) {
         if (rawSlot == TOGGLE_SLOT) {
-            int next = (displayModes.getOrDefault(player.getUniqueId(), 0) + 1) % 3;
+            int next = (displayModes.getOrDefault(player.getUniqueId(), 0) + 1) % 4;
             displayModes.put(player.getUniqueId(), next);
             return ClickAction.toggle();
         }
@@ -128,6 +131,7 @@ public final class BoardUiService {
     }
 
     private void fillBoard(Inventory inventory, Player player, BoardService.Board board, TeamState team, GameMode mode,
+            GameDifficulty difficulty,
             IntUnaryOperator rewardForIndex) {
         int displayMode = displayModes.getOrDefault(player.getUniqueId(), 0);
         for (int i = 0; i < 25; i++) {
@@ -142,7 +146,7 @@ public final class BoardUiService {
                     mode, rewardForIndex.applyAsInt(i)));
         }
         inventory.setItem(TOGGLE_SLOT, toggleItem(displayMode));
-        inventory.setItem(STATUS_SLOT, statusItem(mode));
+        inventory.setItem(STATUS_SLOT, statusItem(mode, difficulty));
     }
 
     private static ItemStack toggleItem(int displayMode) {
@@ -156,7 +160,7 @@ public final class BoardUiService {
         return stack;
     }
 
-    private static ItemStack statusItem(GameMode mode) {
+    private static ItemStack statusItem(GameMode mode, GameDifficulty difficulty) {
         Material icon = switch (mode) {
             case DEFAULT -> Material.NAME_TAG;
             case BUTFAST -> Material.DIAMOND;
@@ -166,13 +170,15 @@ public final class BoardUiService {
         ItemMeta meta = stack.getItemMeta();
         meta.displayName(Component.text("Mode: " + mode.key(), NamedTextColor.GOLD)
                 .decoration(TextDecoration.ITALIC, false));
+        meta.lore(List.of(Component.text("Difficulty: " + difficulty.key(), NamedTextColor.YELLOW)
+                .decoration(TextDecoration.ITALIC, false)));
         stack.setItemMeta(meta);
         return stack;
     }
 
     private static ItemStack boardCell(BoardEntry entry, boolean collected, int effectiveDifficulty, int displayMode,
             GameMode mode, int rewardPoints) {
-        if (collected) {
+        if (collected && displayMode != 3) {
             ItemStack stack = new ItemStack(Material.BARRIER, 1);
             ItemMeta meta = stack.getItemMeta();
             meta.displayName(Component.text("Completed", NamedTextColor.GREEN)
@@ -184,6 +190,17 @@ public final class BoardUiService {
         Material icon = entry.displayMaterial() == null ? Material.PAPER : entry.displayMaterial();
         ItemStack stack = new ItemStack(icon, 1);
         ItemMeta meta = stack.getItemMeta();
+        if (displayMode == 3) {
+            meta.displayName(
+                    Component.text(prettify(entry.id()), collected ? NamedTextColor.GREEN : NamedTextColor.WHITE)
+                            .decoration(TextDecoration.ITALIC, false));
+            if (collected) {
+                meta.lore(List.of(Component.text("Completed", NamedTextColor.GREEN)
+                        .decoration(TextDecoration.ITALIC, false)));
+            }
+            stack.setItemMeta(meta);
+            return stack;
+        }
         if (displayMode == 0) {
             stack.setItemMeta(meta);
             return stack;
@@ -205,6 +222,7 @@ public final class BoardUiService {
         return switch (mode) {
             case 1 -> "difficulty";
             case 2 -> "reward";
+            case 3 -> "all items";
             default -> "name";
         };
     }

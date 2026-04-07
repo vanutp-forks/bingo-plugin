@@ -55,6 +55,7 @@ public final class GameSessionManager {
     private final ScoreboardService scoreboardService;
 
     private final Map<String, PlayerSession> participants = new HashMap<>();
+    private final Set<String> activeRoundPlayers = new HashSet<>();
     private final Map<String, Integer> globalPoints = new HashMap<>();
     private final Map<String, PunishmentState> punishments = new HashMap<>();
 
@@ -78,6 +79,7 @@ public final class GameSessionManager {
     private BoardService.Board lastBoard;
     private final Map<TeamColor, TeamState> lastBoardTeams = new HashMap<>();
     private GameMode lastBoardMode = GameMode.DEFAULT;
+    private GameDifficulty lastBoardDifficulty;
 
     public GameSessionManager(JavaPlugin plugin, RulesConfigService rules, ItemPoolService itemPool,
             BoardService boardService, BoardUiService boardUiService, MessageStyleService messageStyle,
@@ -145,6 +147,14 @@ public final class GameSessionManager {
         return participants.values();
     }
 
+    public boolean isRoundParticipant(String nickname) {
+        return activeRoundPlayers.contains(normalize(nickname));
+    }
+
+    public List<TeamState> visibleTeams() {
+        return hasActiveRoundPhase() ? roundActiveTeams() : teamManager.activeTeams();
+    }
+
     public BoardService.Board board() {
         return board;
     }
@@ -190,11 +200,19 @@ public final class GameSessionManager {
     public void removePlayer(Player player) {
         String nickname = player.getName();
         clearPunishment(nickname, true);
-        if (!isRunning()) {
+        if (isRoundParticipant(nickname)) {
+            activeRoundPlayers.remove(normalize(nickname));
+            player.setGameMode(org.bukkit.GameMode.SPECTATOR);
+            player.setFlying(false);
+            player.teleport(spectatorLocation());
+            reconcileRoundStateAfterRosterChange();
+        } else {
             participants.remove(normalize(nickname));
+            activeRoundPlayers.remove(normalize(nickname));
             teamManager.removePlayer(nickname);
         }
         scoreboardService.update(this);
+        refreshOpenBoards();
     }
 
     public Optional<TeamColor> teamOf(String nickname) {
@@ -218,7 +236,12 @@ public final class GameSessionManager {
             }
         }
 
-        if (teamManager.activeTeams().isEmpty()) {
+        activeRoundPlayers.clear();
+        for (Player player : selectedPlayers) {
+            activeRoundPlayers.add(normalize(player.getName()));
+        }
+
+        if (roundActiveTeams().isEmpty()) {
             throw new IllegalStateException("No active teams.");
         }
 
@@ -226,12 +249,16 @@ public final class GameSessionManager {
         teamManager.resetRoundState();
         elapsedSeconds = 0;
         finishSeconds = rules.durationFor(mode, difficulty);
-        butfastRewardTeamCount = Math.max(1, teamManager.activeTeams().size());
+        butfastRewardTeamCount = Math.max(1, roundActiveTeams().size());
         selectArena();
         buildCage();
         preStartLocked = true;
 
-        for (PlayerSession session : participants.values()) {
+        for (String key : activeRoundPlayers) {
+            PlayerSession session = participants.get(key);
+            if (session == null) {
+                continue;
+            }
             Player player = Bukkit.getPlayerExact(session.nickname());
             if (player != null && player.isOnline()) {
                 preparePlayerForRound(player);
@@ -239,7 +266,7 @@ public final class GameSessionManager {
             }
         }
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (!participants.containsKey(normalize(player.getName()))) {
+            if (!isRoundParticipant(player.getName())) {
                 player.setGameMode(org.bukkit.GameMode.SPECTATOR);
                 player.teleport(new Location(arenaWorld, arenaX + 0.5, 255, arenaZ + 0.5));
             }
@@ -297,7 +324,7 @@ public final class GameSessionManager {
         }
 
         snapshotLastBoardState();
-        List<TeamState> ranking = new ArrayList<>(teamManager.activeTeams());
+        List<TeamState> ranking = new ArrayList<>(roundActiveTeams());
         ranking.sort(teamRankingComparator());
         int points = Math.max(0, ranking.size() - 1);
         for (TeamState state : ranking) {
@@ -324,8 +351,11 @@ public final class GameSessionManager {
         teamManager.resetRoundState();
         board = null;
         clearPunishments();
+        activeRoundPlayers.clear();
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.removePotionEffect(PotionEffectType.SPEED);
+            player.setGameMode(org.bukkit.GameMode.SURVIVAL);
+            player.setFlying(false);
         }
         broadcastActionbar(messageStyle.gameEndedNow());
         playOnlineSound(Sound.BLOCK_BEACON_DEACTIVATE, 0.9f, 1.0f);
@@ -352,6 +382,9 @@ public final class GameSessionManager {
             return;
         }
         if (!isRunning() || board == null) {
+            return;
+        }
+        if (!isRoundParticipant(player.getName())) {
             return;
         }
         PlayerSession session = participants.get(normalize(player.getName()));
@@ -391,6 +424,10 @@ public final class GameSessionManager {
             return false;
         }
         if (!isRunning() || board == null || boardIndex < 0 || boardIndex >= board.entries().length) {
+            return false;
+        }
+        if (!isRoundParticipant(player.getName())) {
+            player.sendActionBar(Component.text("You are not participating.", NamedTextColor.RED));
             return false;
         }
 
@@ -468,6 +505,10 @@ public final class GameSessionManager {
 
     public void onPlayerQuit(Player player) {
         if (hasActiveRoundPhase()) {
+            clearPunishment(player.getName(), false);
+            if (activeRoundPlayers.remove(normalize(player.getName()))) {
+                reconcileRoundStateAfterRosterChange();
+            }
             scoreboardService.update(this);
             return;
         }
@@ -499,7 +540,7 @@ public final class GameSessionManager {
 
     public boolean shouldCancelFallDamage(Player player) {
         return isRunning() && rules.preventFallDamage()
-                && participants.containsKey(normalize(player.getName()));
+                && isRoundParticipant(player.getName());
     }
 
     public boolean shouldCancelCountdownDamage(Player player) {
@@ -507,7 +548,7 @@ public final class GameSessionManager {
     }
 
     public boolean shouldCancelDripstoneDamage(Player player, EntityDamageEvent.DamageCause cause) {
-        if (!isRunning() || !participants.containsKey(normalize(player.getName()))) {
+        if (!isRunning() || !isRoundParticipant(player.getName())) {
             return false;
         }
         String causeName = cause.name();
@@ -523,7 +564,8 @@ public final class GameSessionManager {
     }
 
     public void onHeldSlotChange(Player player, int heldSlot) {
-        if (!rules.enableSpeedBonus() || !hasActiveRoundPhase()) {
+        if (!rules.enableSpeedBonus() || !hasActiveRoundPhase() || !isRoundParticipant(player.getName())
+                || player.getGameMode() != org.bukkit.GameMode.SURVIVAL) {
             player.removePotionEffect(PotionEffectType.SPEED);
             return;
         }
@@ -539,7 +581,7 @@ public final class GameSessionManager {
         if (!isRunning()) {
             return false;
         }
-        if (!participants.containsKey(normalize(player.getName()))) {
+        if (!isRoundParticipant(player.getName())) {
             return false;
         }
         if (punishments.containsKey(normalize(player.getName()))) {
@@ -553,7 +595,7 @@ public final class GameSessionManager {
             return;
         }
         String key = normalize(player.getName());
-        if (!participants.containsKey(key) || punishments.containsKey(key)) {
+        if (!isRoundParticipant(player.getName()) || punishments.containsKey(key)) {
             return;
         }
 
@@ -621,11 +663,12 @@ public final class GameSessionManager {
             team.setFinishedAtSeconds(elapsedSeconds);
             broadcast(team.color().displayNameComponent()
                     .append(Component.text(" has completed the board.", NamedTextColor.GOLD)));
+            moveFinishedTeamToSpectators(team.color());
             playParticipantsSound(Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
         }
 
-        int activeTeams = teamManager.activeTeams().size();
-        long finished = teamManager.activeTeams().stream().filter(TeamState::finished).count();
+        int activeTeams = roundActiveTeams().size();
+        long finished = roundActiveTeams().stream().filter(TeamState::finished).count();
         if (mode == GameMode.BUTFAST) {
             if (finished == activeTeams) {
                 scheduleEndAfterGrace();
@@ -694,7 +737,7 @@ public final class GameSessionManager {
 
     private int rewardForIndex(int index) {
         int teamsCollected = 0;
-        for (TeamState state : teamManager.activeTeams()) {
+        for (TeamState state : roundActiveTeams()) {
             if (state.collected()[index]) {
                 teamsCollected++;
             }
@@ -720,7 +763,8 @@ public final class GameSessionManager {
         }
 
         TeamState team = teamSnapshotForDisplay(session.teamColor());
-        boardUiService.openBoard(player, shownBoard, team, activeOrLastMode(), this::rewardForIndex);
+        boardUiService.openBoard(player, shownBoard, team, activeOrLastMode(), activeOrLastDifficulty(),
+                this::rewardForIndex);
         return true;
     }
 
@@ -729,7 +773,7 @@ public final class GameSessionManager {
             return false;
         }
         BoardService.Board shownBoard = activeOrLastBoard();
-        if (shownBoard == null || !hasActiveRoundPhase()) {
+        if (shownBoard == null) {
             return true;
         }
         PlayerSession session = participants.get(normalize(player.getName()));
@@ -740,13 +784,17 @@ public final class GameSessionManager {
         BoardUiService.ClickAction action = boardUiService.mapClick(player, rawSlot);
         switch (action.type()) {
             case TOGGLE_MODE -> boardUiService.openBoard(player, shownBoard, team, activeOrLastMode(),
-                    this::rewardForIndex);
+                    activeOrLastDifficulty(), this::rewardForIndex);
             case CLAIM -> {
+                if (!hasActiveRoundPhase()) {
+                    return true;
+                }
                 if (isRunning() && board != null) {
                     tryManualClaim(player, action.boardIndex());
                     team = teamManager.stateOf(session.teamColor());
                 }
-                boardUiService.openBoard(player, shownBoard, team, activeOrLastMode(), this::rewardForIndex);
+                boardUiService.openBoard(player, shownBoard, team, activeOrLastMode(), activeOrLastDifficulty(),
+                        this::rewardForIndex);
             }
             default -> {
             }
@@ -769,15 +817,15 @@ public final class GameSessionManager {
     }
 
     public boolean shouldLockBlockActions(Player player) {
-        return preStartLocked && participants.containsKey(normalize(player.getName()));
+        return preStartLocked && isRoundParticipant(player.getName());
     }
 
     public boolean shouldCancelPvp(Player attacker, Player victim) {
         if (!isRunning()) {
             return false;
         }
-        return participants.containsKey(normalize(attacker.getName()))
-                && participants.containsKey(normalize(victim.getName()));
+        return isRoundParticipant(attacker.getName())
+                && isRoundParticipant(victim.getName());
     }
 
     public void onPlayerJoin(Player player) {
@@ -792,13 +840,14 @@ public final class GameSessionManager {
             return;
         }
         PlayerSession session = participants.get(key);
-        if (session != null) {
+        if (session != null && isRoundParticipant(player.getName())) {
             punishment = punishments.get(key);
-            if (punishment != null) {
+            if (punishment != null || teamManager.stateOf(session.teamColor()).finished()) {
                 player.setGameMode(org.bukkit.GameMode.SPECTATOR);
                 player.setFlying(false);
-                int remainingTicks = punishment.remainingTicks();
-                if (remainingTicks > 0) {
+                player.teleport(spectatorLocation());
+                int remainingTicks = punishment == null ? 0 : punishment.remainingTicks();
+                if (punishment != null && remainingTicks > 0) {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, remainingTicks + 40, 1, false,
                             false, false));
                 }
@@ -998,7 +1047,7 @@ public final class GameSessionManager {
     }
 
     private void afterCollection(Player collector, TeamState team, String itemName) {
-        broadcast(messageStyle.teamCollected(team.color(), itemName));
+        broadcast(messageStyle.teamCollected(collector.getName(), team.color(), team.memberCount(), itemName));
         playCollectionSounds(collector);
         checkFinish(team);
         scoreboardService.update(this);
@@ -1017,13 +1066,13 @@ public final class GameSessionManager {
                 continue;
             }
             boardUiService.refreshOpenBoard(player, shownBoard, teamSnapshotForDisplay(session.teamColor()), shownMode,
-                    this::rewardForIndex);
+                    activeOrLastDifficulty(), this::rewardForIndex);
         }
     }
 
     private void playCollectionSounds(Player collector) {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (!participants.containsKey(normalize(player.getName()))) {
+            if (!isRoundParticipant(player.getName())) {
                 continue;
             }
             if (player.getUniqueId().equals(collector.getUniqueId())) {
@@ -1036,7 +1085,7 @@ public final class GameSessionManager {
 
     private void playParticipantsSound(Sound sound, float volume, float pitch) {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (participants.containsKey(normalize(player.getName()))) {
+            if (isRoundParticipant(player.getName())) {
                 player.playSound(player.getLocation(), sound, volume, pitch);
             }
         }
@@ -1054,8 +1103,9 @@ public final class GameSessionManager {
         }
         lastBoard = board;
         lastBoardMode = mode;
+        lastBoardDifficulty = difficulty;
         lastBoardTeams.clear();
-        for (TeamState state : teamManager.activeTeams()) {
+        for (TeamState state : roundActiveTeams()) {
             lastBoardTeams.put(state.color(), copyTeamState(state));
         }
     }
@@ -1066,6 +1116,64 @@ public final class GameSessionManager {
 
     private GameMode activeOrLastMode() {
         return board != null ? mode : lastBoardMode;
+    }
+
+    private GameDifficulty activeOrLastDifficulty() {
+        return board != null ? difficulty : lastBoardDifficulty;
+    }
+
+    private List<TeamState> roundActiveTeams() {
+        List<TeamState> result = new ArrayList<>();
+        for (TeamState state : teamManager.activeTeams()) {
+            if (activeRoundPlayers.stream()
+                    .map(participants::get)
+                    .filter(java.util.Objects::nonNull)
+                    .anyMatch(session -> session.teamColor() == state.color())) {
+                result.add(state);
+            }
+        }
+        return result;
+    }
+
+    private void moveFinishedTeamToSpectators(TeamColor color) {
+        for (String key : activeRoundPlayers) {
+            PlayerSession session = participants.get(key);
+            if (session == null || session.teamColor() != color) {
+                continue;
+            }
+            Player player = Bukkit.getPlayerExact(session.nickname());
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
+            player.setGameMode(org.bukkit.GameMode.SPECTATOR);
+            player.setFlying(false);
+            player.teleport(spectatorLocation());
+        }
+    }
+
+    private void reconcileRoundStateAfterRosterChange() {
+        if (!hasActiveRoundPhase()) {
+            return;
+        }
+        List<TeamState> activeTeams = roundActiveTeams();
+        butfastRewardTeamCount = Math.max(1, activeTeams.size());
+        if (activeTeams.isEmpty()) {
+            endGame(true);
+            return;
+        }
+        if (!isRunning()) {
+            return;
+        }
+        long finished = activeTeams.stream().filter(TeamState::finished).count();
+        if (mode == GameMode.BUTFAST) {
+            if (finished == activeTeams.size()) {
+                scheduleEndAfterGrace();
+            }
+            return;
+        }
+        if (finished >= Math.max(1, activeTeams.size() - 1)) {
+            scheduleEndAfterGrace();
+        }
     }
 
     private TeamState teamSnapshotForDisplay(TeamColor color) {
@@ -1080,7 +1188,11 @@ public final class GameSessionManager {
     }
 
     private void runPeriodicPlayerChecks() {
-        for (PlayerSession session : participants.values()) {
+        for (String key : activeRoundPlayers) {
+            PlayerSession session = participants.get(key);
+            if (session == null) {
+                continue;
+            }
             Player player = Bukkit.getPlayerExact(session.nickname());
             if (player == null || !player.isOnline()) {
                 continue;
@@ -1125,13 +1237,22 @@ public final class GameSessionManager {
         if (player == null || !player.isOnline()) {
             return;
         }
-        if (!participants.containsKey(normalize(player.getName()))) {
+        if (!isRoundParticipant(player.getName())) {
             punishments.remove(key);
             state.releaseTask.cancel();
             return;
         }
         punishments.remove(key);
         state.releaseTask.cancel();
+
+        PlayerSession session = participants.get(key);
+        if (session != null && teamManager.stateOf(session.teamColor()).finished()) {
+            player.removePotionEffect(PotionEffectType.BLINDNESS);
+            player.setGameMode(org.bukkit.GameMode.SPECTATOR);
+            player.setFlying(false);
+            player.teleport(spectatorLocation());
+            return;
+        }
 
         player.removePotionEffect(PotionEffectType.BLINDNESS);
         player.setGameMode(org.bukkit.GameMode.SURVIVAL);

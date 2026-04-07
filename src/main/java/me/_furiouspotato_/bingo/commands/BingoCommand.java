@@ -158,13 +158,10 @@ public final class BingoCommand {
     private int runLeaveSelf(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         CommandSender sender = sender(ctx);
         try {
-            boolean admin = isAdmin(sender);
             Player self = requirePlayer(sender);
-            if (session.isRunning() && !admin) {
-                throw new IllegalStateException("Only admins can modify teams while a game is running.");
-            }
+            boolean leavingRound = session.isRoundParticipant(self.getName());
             session.removePlayer(self);
-            self.sendMessage("You left your team.");
+            info(self, leavingRound ? "You left the current game." : "You left your team.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return fail(sender, ex.getMessage());
         }
@@ -176,8 +173,11 @@ public final class BingoCommand {
         try {
             requireAdmin(sender);
             Player target = requireOnlinePlayer(StringArgumentType.getString(ctx, "player"));
+            boolean leavingRound = session.isRoundParticipant(target.getName());
             session.removePlayer(target);
-            target.sendMessage("An admin removed you from the game teams.");
+            info(target, leavingRound
+                    ? "An admin removed you from the current game."
+                    : "An admin removed you from the game teams.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return fail(sender, ex.getMessage());
         }
@@ -251,11 +251,11 @@ public final class BingoCommand {
         CommandSender sender = sender(ctx);
         String summary = session.participantsSummary();
         if (summary.isBlank()) {
-            sender.sendMessage("No active team members.");
+            info(sender, "No active team members.");
             return Command.SINGLE_SUCCESS;
         }
-        sender.sendMessage("Teams:");
-        sender.sendMessage(summary);
+        info(sender, "Teams:");
+        sender.sendMessage(Component.text(summary, NamedTextColor.YELLOW));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -266,7 +266,7 @@ public final class BingoCommand {
             GameMode mode = GameMode.fromKey(StringArgumentType.getString(ctx, "mode"));
             session.setMode(mode);
             rules.saveRuntimeSettings();
-            sender.sendMessage("Default mode set to " + mode.key() + ".");
+            info(sender, "Default mode set to " + mode.key() + ".");
         } catch (IllegalArgumentException ex) {
             return fail(sender, ex.getMessage());
         }
@@ -280,7 +280,7 @@ public final class BingoCommand {
             GameDifficulty difficulty = rules.requireDifficulty(StringArgumentType.getString(ctx, "difficulty"));
             session.setDifficulty(difficulty);
             rules.saveRuntimeSettings();
-            sender.sendMessage("Default difficulty set to " + difficulty.key() + ".");
+            info(sender, "Default difficulty set to " + difficulty.key() + ".");
         } catch (IllegalArgumentException ex) {
             return fail(sender, ex.getMessage());
         }
@@ -298,7 +298,7 @@ public final class BingoCommand {
         if (rules.debugPrintNodeGraphOnStartup()) {
             NodeDebugPrinter.print(plugin.getLogger(), itemPool, dependencyCostService);
         }
-        sender.sendMessage("Reloaded config and node graph.");
+        info(sender, "Reloaded config and node graph.");
         return Command.SINGLE_SUCCESS;
     }
 
@@ -314,7 +314,7 @@ public final class BingoCommand {
         }
         rules.setBoardClaimMode(mode);
         rules.saveRuntimeSettings();
-        sender.sendMessage("Board claim mode set to " + mode.key() + ".");
+        info(sender, "Board claim mode set to " + mode.key() + ".");
         return Command.SINGLE_SUCCESS;
     }
 
@@ -329,7 +329,7 @@ public final class BingoCommand {
         boolean enabled = Boolean.parseBoolean(raw);
         rules.setConsumeOnClaim(enabled);
         rules.saveRuntimeSettings();
-        sender.sendMessage("Consume on claim set to " + enabled + ".");
+        info(sender, "Consume on claim set to " + enabled + ".");
         return Command.SINGLE_SUCCESS;
     }
 
@@ -351,6 +351,10 @@ public final class BingoCommand {
         return Command.SINGLE_SUCCESS;
     }
 
+    private static void info(CommandSender sender, String message) {
+        sender.sendMessage(Component.text(message, NamedTextColor.GOLD));
+    }
+
     private Player requirePlayer(CommandSender sender) {
         if (!(sender instanceof Player player)) {
             throw new IllegalArgumentException("This command requires an in-game player.");
@@ -367,20 +371,25 @@ public final class BingoCommand {
     }
 
     private void printHelp(CommandSender sender) {
-        sender.sendMessage("Bingo commands:");
-        sender.sendMessage("/bingo join - auto-join lowest population team.");
-        sender.sendMessage("/bingo join <team> - join a specific wool-color team.");
-        sender.sendMessage("/bingo join <team> <players> - admin: assign selected players to a team.");
-        sender.sendMessage("/bingo list - list non-empty teams.");
-        sender.sendMessage("/bingo start [selector] - start game. Default: @a.");
-        sender.sendMessage("/bingo stop - end current game.");
-        sender.sendMessage("/bingo restart [selector] - restart with current settings.");
-        sender.sendMessage("/bingo mode <mode> - set game mode.");
-        sender.sendMessage("/bingo difficulty <difficulty> - set game difficulty.");
-        sender.sendMessage("/bingo cardmode <auto|manual> - set claim mode.");
-        sender.sendMessage("/bingo returncard - return your bingo card.");
+        info(sender, "Bingo commands:");
+        sender.sendMessage(Component.text("/bingo join - auto-join lowest population team.", NamedTextColor.YELLOW));
         sender.sendMessage(
-                "Admin-only: /bingo join <team> <players>, /bingo leave <player>, /bingo reload, /bingo consumeonclaim");
+                Component.text("/bingo join <team> - join a specific wool-color team.", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/bingo join <team> <players> - admin: assign selected players to a team.",
+                NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/bingo list - list non-empty teams.", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/bingo start [selector] - start game. Default: @a.", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/bingo stop - end current game.", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/bingo restart [selector] - restart with current settings.",
+                NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/bingo mode <mode> - set game mode.", NamedTextColor.YELLOW));
+        sender.sendMessage(
+                Component.text("/bingo difficulty <difficulty> - set game difficulty.", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/bingo cardmode <auto|manual> - set claim mode.", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/bingo returncard - return your bingo card.", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text(
+                "Admin-only: /bingo join <team> <players>, /bingo leave <player>, /bingo reload, /bingo consumeonclaim",
+                NamedTextColor.YELLOW));
     }
 
     private static boolean isAdmin(CommandSender sender) {

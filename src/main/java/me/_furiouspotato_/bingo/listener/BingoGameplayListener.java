@@ -118,7 +118,12 @@ public final class BingoGameplayListener implements Listener {
     @EventHandler
     public void onInteract(PlayerInteractEvent event) {
         Action action = event.getAction();
-        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) {
+        boolean spectator = event.getPlayer().getGameMode() == org.bukkit.GameMode.SPECTATOR;
+        if (spectator) {
+            if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK) {
+                return;
+            }
+        } else if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) {
             return;
         }
         ItemStack item = event.getItem();

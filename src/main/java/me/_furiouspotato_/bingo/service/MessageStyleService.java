@@ -9,7 +9,7 @@ import me._furiouspotato_.bingo.model.TeamColor;
 
 public final class MessageStyleService {
     public Component teamLabel(String nickname, TeamColor color, int memberCount) {
-        if (memberCount == 1) {
+        if (nickname != null && !nickname.isBlank()) {
             return Component.text(nickname, color.textColor());
         }
         return color.displayNameComponent();
@@ -39,13 +39,14 @@ public final class MessageStyleService {
 
     public Component gameStarted(GameMode mode, GameDifficulty difficulty) {
         return Component.text("Game started: ", NamedTextColor.GREEN)
+                .append(Component.text("mode ", NamedTextColor.GREEN))
                 .append(Component.text(mode.key(), NamedTextColor.GOLD))
-                .append(Component.text(" / ", NamedTextColor.GREEN))
+                .append(Component.text(", difficulty ", NamedTextColor.GREEN))
                 .append(Component.text(difficulty.key(), NamedTextColor.GOLD));
     }
 
-    public Component teamCollected(TeamColor teamColor, String itemName) {
-        return teamColor.displayNameComponent()
+    public Component teamCollected(String nickname, TeamColor teamColor, int memberCount, String itemName) {
+        return teamLabel(nickname, teamColor, memberCount)
                 .append(Component.text(" collected ", NamedTextColor.GOLD))
                 .append(Component.text(itemName, NamedTextColor.AQUA))
                 .append(Component.text(".", NamedTextColor.GOLD));
