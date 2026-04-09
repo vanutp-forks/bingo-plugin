@@ -28,8 +28,8 @@ countdown-time: 10
 punishment-time: 10
 # grace period before auto end in seconds
 after-game-time: 10
-# print nodes, recipes, merged buckets and board items on startup
-debug-print-node-graph-on-startup: false
+# print debug information about node costs and generated boards
+print-debug-information: false
 # board claim mode: auto | manual
 board-claim-mode: auto
 # default bingo mode
@@ -43,37 +43,37 @@ default-difficulty: easy
 # durations = round timer per mode in seconds
 difficulty-levels:
   - key: baby
-    target-score: 8
+    target-score: 10
     max-deviation: 10
     durations:
       default: 600
       butfast: 300
       collectall: 900
   - key: easy
-    target-score: 20
-    max-deviation: 15
+    target-score: 30
+    max-deviation: 20
+    durations:
+      default: 900
+      butfast: 600
+      collectall: 1200
+  - key: medium
+    target-score: 75
+    max-deviation: 35
     durations:
       default: 1200
-      butfast: 600
+      butfast: 900
       collectall: 1800
-  - key: medium
-    target-score: 50
-    max-deviation: 30
+  - key: hard
+    target-score: 150
+    max-deviation: 50
+    durations:
+      default: 1800
+      butfast: 1200
+      collectall: 2400
+  - key: insane
+    target-score: 400
+    max-deviation: 200
     durations:
       default: 3600
-      butfast: 1800
-      collectall: 5400
-  - key: hard
-    target-score: 100
-    max-deviation: 40
-    durations:
-      default: 10800
-      butfast: 5400
-      collectall: 16200
-  - key: insane
-    target-score: 200
-    max-deviation: 80
-    durations:
-      default: 14400
-      butfast: 7200
+      butfast: 2400
       collectall: 21600

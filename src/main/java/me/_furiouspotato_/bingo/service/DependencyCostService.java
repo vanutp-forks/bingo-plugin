@@ -35,7 +35,19 @@ public final class DependencyCostService {
     }
 
     public Evaluation evaluateNode(String nodeId) {
-        Map<String, Integer> totalDemand = computeTotalDemand(nodeId);
+        return evaluateDemand(Map.of(nodeId, 1));
+    }
+
+    public Evaluation evaluateNodes(Iterable<String> nodeIds) {
+        Map<String, Integer> requestedNodes = new LinkedHashMap<>();
+        for (String nodeId : nodeIds) {
+            requestedNodes.merge(nodeId, 1, Integer::sum);
+        }
+        return evaluateDemand(requestedNodes);
+    }
+
+    private Evaluation evaluateDemand(Map<String, Integer> requestedNodes) {
+        Map<String, Integer> totalDemand = computeTotalDemand(requestedNodes);
         Map<String, Integer> mergedResources = new TreeMap<>();
         Map<OperationDepthKey, Integer> mergedOperations = new TreeMap<>();
 
@@ -56,7 +68,7 @@ public final class DependencyCostService {
                 continue;
             }
             NodeRecipe recipe = node.recipe();
-            int batches = ceilDiv(entry.getValue(), recipe.outputAmount());
+            int batches = requiredBatches(node, entry.getValue(), recipe.outputAmount());
             int opDepth = recipeOperationDepth(node.id());
             for (Map.Entry<String, Integer> ingredient : recipe.ingredients().entrySet()) {
                 CostNode ingredientNode = requireNode(ingredient.getKey());
@@ -79,10 +91,14 @@ public final class DependencyCostService {
         return new Evaluation(total, Map.copyOf(mergedResources), Map.copyOf(mergedOperations), maxDepth);
     }
 
-    private Map<String, Integer> computeTotalDemand(String rootNodeId) {
+    private Map<String, Integer> computeTotalDemand(Map<String, Integer> requestedNodes) {
         Map<String, Integer> totalDemand = new TreeMap<>();
         Map<String, Integer> expandedBatches = new HashMap<>();
-        totalDemand.put(rootNodeId, 1);
+        for (Map.Entry<String, Integer> entry : requestedNodes.entrySet()) {
+            if (entry.getValue() != null && entry.getValue() > 0) {
+                totalDemand.merge(entry.getKey(), entry.getValue(), Integer::sum);
+            }
+        }
 
         boolean changed;
         do {
@@ -96,7 +112,7 @@ public final class DependencyCostService {
                 }
 
                 NodeRecipe recipe = node.recipe();
-                int totalBatches = ceilDiv(entry.getValue(), recipe.outputAmount());
+                int totalBatches = requiredBatches(node, entry.getValue(), recipe.outputAmount());
                 int previousBatches = expandedBatches.getOrDefault(nodeId, 0);
                 if (totalBatches <= previousBatches) {
                     continue;
@@ -171,6 +187,14 @@ public final class DependencyCostService {
 
     private static int ceilDiv(int x, int y) {
         return (x + y - 1) / y;
+    }
+
+    private static int requiredBatches(CostNode node, int quantity, int outputAmount) {
+        int batches = ceilDiv(quantity, outputAmount);
+        if (node.once()) {
+            return Math.min(1, batches);
+        }
+        return batches;
     }
 
     public record Evaluation(double totalScore, Map<String, Integer> resourceCounts,

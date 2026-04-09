@@ -245,7 +245,8 @@ public final class GameSessionManager {
             throw new IllegalStateException("No active teams.");
         }
 
-        board = boardService.generateBoard(mode, difficulty, itemPool.entries());
+        BoardService.GeneratedBoard generatedBoard = boardService.generateBoard(mode, difficulty, itemPool.entries());
+        board = generatedBoard.board();
         teamManager.resetRoundState();
         elapsedSeconds = 0;
         finishSeconds = rules.durationFor(mode, difficulty);
@@ -1147,7 +1148,6 @@ public final class GameSessionManager {
             }
             player.setGameMode(org.bukkit.GameMode.SPECTATOR);
             player.setFlying(false);
-            player.teleport(spectatorLocation());
         }
     }
 

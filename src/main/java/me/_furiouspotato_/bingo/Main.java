@@ -36,15 +36,15 @@ public final class Main extends JavaPlugin {
         DependencyCostService dependencyCostService = new DependencyCostService(this);
         dependencyCostService.setNodes(itemPool.nodes());
         dependencyCostService.refresh();
-        getLogger().info("Node graph debug enabled: " + rules.debugPrintNodeGraphOnStartup());
-        if (rules.debugPrintNodeGraphOnStartup()) {
+        getLogger().info("Debug information enabled: " + rules.printDebugInformation());
+        if (rules.printDebugInformation()) {
             NodeDebugPrinter.print(getLogger(), itemPool, dependencyCostService);
         }
 
         TeamManager teamManager = new TeamManager(teamPreferenceStore);
         teamManager.load();
 
-        BoardService boardService = new BoardService(rules, dependencyCostService);
+        BoardService boardService = new BoardService(this, rules, dependencyCostService);
         BoardUiService boardUiService = new BoardUiService(this);
         MessageStyleService messageStyleService = new MessageStyleService();
         PlayerRoundPreparationService roundPreparationService = new PlayerRoundPreparationService(rules,

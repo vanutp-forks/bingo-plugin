@@ -5,6 +5,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
+import org.bukkit.plugin.java.JavaPlugin;
+
 import me._furiouspotato_.bingo.model.BoardEntry;
 import me._furiouspotato_.bingo.model.GameDifficulty;
 import me._furiouspotato_.bingo.model.GameMode;
@@ -13,14 +15,23 @@ public final class BoardService {
     public record Board(BoardEntry[] entries, int[] effectiveDifficulties) {
     }
 
+    public record GeneratedBoard(Board board, int selectionDistance, int attemptsTried, int candidateCount,
+            int poolSize,
+            int requiredCount) {
+    }
+
+    private final JavaPlugin plugin;
+    private final RulesConfigService rules;
     private static final int[] COLLECT_ALL_SLOTS = { 6, 7, 8, 11, 12, 13, 16, 17, 18 };
     private final DependencyCostService dependencyCostService;
 
-    public BoardService(RulesConfigService rules, DependencyCostService dependencyCostService) {
+    public BoardService(JavaPlugin plugin, RulesConfigService rules, DependencyCostService dependencyCostService) {
+        this.plugin = plugin;
+        this.rules = rules;
         this.dependencyCostService = dependencyCostService;
     }
 
-    public Board generateBoard(GameMode mode, GameDifficulty difficulty, List<BoardEntry> pool) {
+    public GeneratedBoard generateBoard(GameMode mode, GameDifficulty difficulty, List<BoardEntry> pool) {
         if (pool.isEmpty()) {
             throw new IllegalStateException("Board entry pool is empty.");
         }
@@ -45,8 +56,10 @@ public final class BoardService {
         Random random = new Random();
         Board bestBoard = null;
         int bestDistance = Integer.MAX_VALUE;
+        int attemptsTried = 0;
 
         for (int attempt = 0; attempt < 1200; attempt++) {
+            attemptsTried = attempt + 1;
             Collections.shuffle(candidates, random);
             List<Candidate> chosen = candidates.subList(0, required);
             Board board = placeOnBoard(mode, chosen);
@@ -63,7 +76,13 @@ public final class BoardService {
         if (bestBoard == null) {
             throw new IllegalStateException("Could not generate a valid board.");
         }
-        return bestBoard;
+        GeneratedBoard generatedBoard = new GeneratedBoard(bestBoard, bestDistance, attemptsTried, candidates.size(),
+                pool.size(), required);
+        if (rules.printDebugInformation()) {
+            NodeDebugPrinter.printGeneratedBoard(plugin.getLogger(), mode, difficulty, generatedBoard, pool,
+                    dependencyCostService);
+        }
+        return generatedBoard;
     }
 
     private static Board placeOnBoard(GameMode mode, List<Candidate> chosen) {
@@ -84,21 +103,23 @@ public final class BoardService {
         return new Board(entries, effectiveDifficulties);
     }
 
-    private static int scoreDistance(GameMode mode, GameDifficulty difficulty, Board board) {
+    private int scoreDistance(GameMode mode, GameDifficulty difficulty, Board board) {
         if (mode == GameMode.DEFAULT) {
-            int distance = 0;
+            double distance = 0d;
             for (int[] line : lines()) {
-                int sum = 0;
-                for (int idx : line) {
-                    sum += board.effectiveDifficulties[idx];
+                DependencyCostService.Evaluation lineEvaluation = evaluateLine(board, line);
+                int count = countActiveCells(board, line);
+                if (count <= 0) {
+                    continue;
                 }
-                int avg = sum / 5;
+                double totalScore = lineEvaluation.totalScore();
+                double avg = totalScore / count;
                 if (Math.abs(avg - difficulty.targetScore()) > difficulty.maxDeviation()) {
                     return -1;
                 }
-                distance += square(sum - difficulty.targetScore() * 5);
+                distance += fourthPower(totalScore - difficulty.targetScore() * count);
             }
-            return distance;
+            return (int) Math.round(distance);
         }
 
         int sum = 0;
@@ -130,8 +151,30 @@ public final class BoardService {
         return lines;
     }
 
-    private static int square(int x) {
-        return x * x;
+    private static double fourthPower(double x) {
+        double squared = x * x;
+        return squared * squared;
+    }
+
+    private DependencyCostService.Evaluation evaluateLine(Board board, int[] line) {
+        List<String> nodeIds = new ArrayList<>();
+        for (int idx : line) {
+            BoardEntry entry = board.entries()[idx];
+            if (entry != null) {
+                nodeIds.add(entry.costNodeId());
+            }
+        }
+        return dependencyCostService.evaluateNodes(nodeIds);
+    }
+
+    private static int countActiveCells(Board board, int[] line) {
+        int count = 0;
+        for (int idx : line) {
+            if (board.entries()[idx] != null) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private record Candidate(BoardEntry entry, int effectiveDifficulty) {

@@ -37,7 +37,7 @@ public final class RulesConfigService {
     private boolean showGlobalScore = true;
     private boolean consumeOnClaim = true;
     private String defaultWorldName = "world";
-    private boolean debugPrintNodeGraphOnStartup = false;
+    private boolean printDebugInformation = false;
 
     public RulesConfigService(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -69,7 +69,8 @@ public final class RulesConfigService {
         consumeOnClaim = cfg.getBoolean("consume-on-claim", true);
         defaultWorldName = cfg.getString("default-world-name", "world");
         boardClaimMode = parseClaimMode(cfg.getString("board-claim-mode", BoardClaimMode.AUTO.key()));
-        debugPrintNodeGraphOnStartup = cfg.getBoolean("debug-print-node-graph-on-startup", false);
+        printDebugInformation = cfg.getBoolean("print-debug-information",
+                cfg.getBoolean("debug-print-node-graph-on-startup", false));
     }
 
     public GameMode defaultMode() {
@@ -182,8 +183,8 @@ public final class RulesConfigService {
         return defaultWorldName;
     }
 
-    public boolean debugPrintNodeGraphOnStartup() {
-        return debugPrintNodeGraphOnStartup;
+    public boolean printDebugInformation() {
+        return printDebugInformation;
     }
 
     public void saveRuntimeSettings() {

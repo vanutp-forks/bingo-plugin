@@ -294,8 +294,8 @@ public final class BingoCommand {
         itemPool.load();
         dependencyCostService.setNodes(itemPool.nodes());
         dependencyCostService.refresh();
-        plugin.getLogger().info("Node graph debug enabled: " + rules.debugPrintNodeGraphOnStartup());
-        if (rules.debugPrintNodeGraphOnStartup()) {
+        plugin.getLogger().info("Debug information enabled: " + rules.printDebugInformation());
+        if (rules.printDebugInformation()) {
             NodeDebugPrinter.print(plugin.getLogger(), itemPool, dependencyCostService);
         }
         info(sender, "Reloaded config and node graph.");

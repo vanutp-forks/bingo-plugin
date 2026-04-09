@@ -108,7 +108,7 @@ nodes:
   - id: smelt
     type: operation
     base: 2.5
-    per-batch: 1.5
+    per-batch: 4.0
     beta: 0.7
 
   - id: dirt
@@ -228,7 +228,7 @@ nodes:
     beta: 0.45
 
   - id: cobbled_deepslate_gather
-    base: 14.0
+    base: 10.0
     per-batch: 1.0
     beta: 0.50
 
@@ -265,6 +265,13 @@ nodes:
 
   - id: glow_lichen
     material: minecraft:glow_lichen
+    recipe:
+      ingredients:
+        deep_underground: 1
+        shears: 1
+        glow_lichen_gather: 1
+
+  - id: glow_lichen_gather
     base: 48.0
     per-batch: 2.0
     beta: 0.50
@@ -272,7 +279,7 @@ nodes:
   - id: cobweb
     material: minecraft:cobweb
     base: 78.0
-    per-batch: 2.0
+    per-batch: 8.0
     beta: 0.70
 
   - id: wheat_seeds
@@ -293,59 +300,53 @@ nodes:
     per-batch: 2.0
     beta: 0.45
 
-  - id: cod
-    material: minecraft:cod
-    base: 24.0
-    per-batch: 1.0
-    beta: 0.50
-
   - id: salmon
     material: minecraft:salmon
     base: 24.0
-    per-batch: 1.0
-    beta: 0.50
+    per-batch: 3.0
+    beta: 0.9
 
   - id: porkchop
     material: minecraft:porkchop
     base: 14.0
-    per-batch: 1.0
+    per-batch: 3.0
     beta: 0.55
 
   - id: beef
     material: minecraft:beef
     base: 14.0
-    per-batch: 1.0
+    per-batch: 3.0
     beta: 0.55
 
   - id: chicken
     material: minecraft:chicken
     base: 14.0
-    per-batch: 1.0
+    per-batch: 3.0
     beta: 0.55
 
   - id: mutton
     material: minecraft:mutton
     base: 14.0
-    per-batch: 1.0
+    per-batch: 3.0
     beta: 0.55
 
   - id: rotten_flesh
     material: minecraft:rotten_flesh
     base: 24.0
-    per-batch: 1.0
+    per-batch: 3.0
     beta: 0.55
 
   - id: glow_ink_sac
     material: minecraft:glow_ink_sac
-    base: 95.0
-    per-batch: 5.0
+    base: 50.0
+    per-batch: 10.0
     beta: 0.75
 
   - id: nautilus_shell
     material: minecraft:nautilus_shell
-    base: 95.0
-    per-batch: 5.0
-    beta: 0.75
+    base: 100.0
+    per-batch: 150.0
+    beta: 0.9
 
   - id: heart_of_the_sea
     material: minecraft:heart_of_the_sea
@@ -599,9 +600,9 @@ nodes:
         emerald_gather: 1
 
   - id: redstone_gather
-    base: 19.0
+    base: 30.0
     per-batch: 1.0
-    beta: 0.60
+    beta: 0.40
 
   - id: redstone
     material: minecraft:redstone
@@ -611,7 +612,7 @@ nodes:
         redstone_gather: 1
 
   - id: lapis_lazuli_gather
-    base: 59.0
+    base: 30.0
     per-batch: 1.0
     beta: 0.60
 
@@ -630,15 +631,15 @@ nodes:
 
   - id: dandelion
     material: minecraft:dandelion
-    base: 14.0
-    per-batch: 1.0
-    beta: 0.50
+    base: 16.0
+    per-batch: 4.0
+    beta: 0.8
 
   - id: poppy
     material: minecraft:poppy
-    base: 14.0
-    per-batch: 1.0
-    beta: 0.50
+    base: 16.0
+    per-batch: 4.0
+    beta: 0.8
 
   - id: water_collect
     base: 2.0
@@ -652,13 +653,13 @@ nodes:
 
   - id: deep_underground
     once: true
-    base: 10.0
+    base: 30.0
     per-batch: 0.0
     beta: 0.0
 
   - id: find_lava
     once: true
-    base: 10.0
+    base: 20.0
     per-batch: 0.0
     beta: 0.0
 
