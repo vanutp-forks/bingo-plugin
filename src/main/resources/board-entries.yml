@@ -354,12 +354,6 @@ nodes:
     per-batch: 20.0
     beta: 0.90
 
-  - id: trident
-    material: minecraft:trident
-    base: 590.0
-    per-batch: 45.0
-    beta: 0.95
-
   - id: crimson_stems
     tag: minecraft:crimson_stems
     display-material: minecraft:crimson_stem
@@ -414,7 +408,7 @@ nodes:
         ancient_debris_gather: 1
 
   - id: soul_sand_gather
-    base: 18.0
+    base: 35.0
     per-batch: 2.0
     beta: 0.45
 

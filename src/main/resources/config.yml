@@ -71,9 +71,9 @@ difficulty-levels:
       butfast: 1200
       collectall: 2400
   - key: insane
-    target-score: 400
-    max-deviation: 200
+    target-score: 800
+    max-deviation: 600
     durations:
-      default: 3600
-      butfast: 2400
+      default: 10800
+      butfast: 5400
       collectall: 21600

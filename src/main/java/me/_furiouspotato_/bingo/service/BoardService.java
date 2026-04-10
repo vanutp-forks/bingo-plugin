@@ -16,8 +16,12 @@ public final class BoardService {
     }
 
     public record GeneratedBoard(Board board, int selectionDistance, int attemptsTried, int candidateCount,
-            int poolSize,
-            int requiredCount) {
+            int poolSize, int requiredCount, double lowestLineAverage, double highestLineAverage,
+            double averageLineAverage) {
+    }
+
+    private record BoardAssessment(int distance, double lowestLineAverage, double highestLineAverage,
+            double averageLineAverage) {
     }
 
     private final JavaPlugin plugin;
@@ -57,18 +61,24 @@ public final class BoardService {
         Board bestBoard = null;
         int bestDistance = Integer.MAX_VALUE;
         int attemptsTried = 0;
+        double bestLowestLineAverage = 0d;
+        double bestHighestLineAverage = 0d;
+        double bestAverageLineAverage = 0d;
 
         for (int attempt = 0; attempt < 1200; attempt++) {
             attemptsTried = attempt + 1;
             Collections.shuffle(candidates, random);
             List<Candidate> chosen = candidates.subList(0, required);
             Board board = placeOnBoard(mode, chosen);
-            int distance = scoreDistance(mode, difficulty, board);
-            if (distance >= 0 && distance < bestDistance) {
-                bestDistance = distance;
+            BoardAssessment assessment = scoreDistance(mode, difficulty, board);
+            if (assessment.distance() >= 0 && assessment.distance() < bestDistance) {
+                bestDistance = assessment.distance();
                 bestBoard = board;
+                bestLowestLineAverage = assessment.lowestLineAverage();
+                bestHighestLineAverage = assessment.highestLineAverage();
+                bestAverageLineAverage = assessment.averageLineAverage();
             }
-            if (distance == 0) {
+            if (assessment.distance() == 0) {
                 break;
             }
         }
@@ -77,7 +87,7 @@ public final class BoardService {
             throw new IllegalStateException("Could not generate a valid board.");
         }
         GeneratedBoard generatedBoard = new GeneratedBoard(bestBoard, bestDistance, attemptsTried, candidates.size(),
-                pool.size(), required);
+                pool.size(), required, bestLowestLineAverage, bestHighestLineAverage, bestAverageLineAverage);
         if (rules.printDebugInformation()) {
             NodeDebugPrinter.printGeneratedBoard(plugin.getLogger(), mode, difficulty, generatedBoard, pool,
                     dependencyCostService);
@@ -103,9 +113,12 @@ public final class BoardService {
         return new Board(entries, effectiveDifficulties);
     }
 
-    private int scoreDistance(GameMode mode, GameDifficulty difficulty, Board board) {
+    private BoardAssessment scoreDistance(GameMode mode, GameDifficulty difficulty, Board board) {
         if (mode == GameMode.DEFAULT) {
-            double distance = 0d;
+            double minAverage = Double.POSITIVE_INFINITY;
+            double maxAverage = Double.NEGATIVE_INFINITY;
+            double averageSum = 0d;
+            int lineCount = 0;
             for (int[] line : lines()) {
                 DependencyCostService.Evaluation lineEvaluation = evaluateLine(board, line);
                 int count = countActiveCells(board, line);
@@ -114,12 +127,17 @@ public final class BoardService {
                 }
                 double totalScore = lineEvaluation.totalScore();
                 double avg = totalScore / count;
-                if (Math.abs(avg - difficulty.targetScore()) > difficulty.maxDeviation()) {
-                    return -1;
-                }
-                distance += fourthPower(totalScore - difficulty.targetScore() * count);
+                minAverage = Math.min(minAverage, avg);
+                maxAverage = Math.max(maxAverage, avg);
+                averageSum += avg;
+                lineCount++;
             }
-            return (int) Math.round(distance);
+            if (lineCount == 0) {
+                return new BoardAssessment(-1, 0d, 0d, 0d);
+            }
+            double spread = maxAverage - minAverage;
+            double meanAverage = averageSum / lineCount;
+            return new BoardAssessment((int) Math.round(spread * 1000d), minAverage, maxAverage, meanAverage);
         }
 
         int sum = 0;
@@ -133,9 +151,9 @@ public final class BoardService {
         }
         int avg = sum / Math.max(1, count);
         if (Math.abs(avg - difficulty.targetScore()) > difficulty.maxDeviation()) {
-            return -1;
+            return new BoardAssessment(-1, avg, avg, avg);
         }
-        return Math.abs(sum - difficulty.targetScore() * count);
+        return new BoardAssessment(Math.abs(sum - difficulty.targetScore() * count), avg, avg, avg);
     }
 
     private static List<int[]> lines() {
@@ -149,11 +167,6 @@ public final class BoardService {
         lines.add(new int[] { 0, 6, 12, 18, 24 });
         lines.add(new int[] { 4, 8, 12, 16, 20 });
         return lines;
-    }
-
-    private static double fourthPower(double x) {
-        double squared = x * x;
-        return squared * squared;
     }
 
     private DependencyCostService.Evaluation evaluateLine(Board board, int[] line) {

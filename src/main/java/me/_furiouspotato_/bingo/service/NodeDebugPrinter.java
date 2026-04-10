@@ -85,9 +85,16 @@ public final class NodeDebugPrinter {
         log(logger, BOARD_PREFIX, "  candidates in band: " + generatedBoard.candidateCount());
         log(logger, BOARD_PREFIX, "  required cells: " + generatedBoard.requiredCount());
         log(logger, BOARD_PREFIX, "  attempts tried: " + generatedBoard.attemptsTried());
+        if (mode == GameMode.DEFAULT) {
+            log(logger, BOARD_PREFIX, "  lowest line average: " + format(generatedBoard.lowestLineAverage()));
+            log(logger, BOARD_PREFIX, "  highest line average: " + format(generatedBoard.highestLineAverage()));
+            log(logger, BOARD_PREFIX, "  average line average: " + format(generatedBoard.averageLineAverage()));
+            log(logger, BOARD_PREFIX, "  line spread: "
+                    + format(generatedBoard.highestLineAverage() - generatedBoard.lowestLineAverage()));
+        }
         log(logger, BOARD_PREFIX, "  selection distance: " + generatedBoard.selectionDistance());
         log(logger, BOARD_PREFIX, "  selection metric: "
-                + (mode == GameMode.DEFAULT ? "sum of squared line deltas" : "absolute total delta"));
+                + (mode == GameMode.DEFAULT ? "lowest/highest line average spread" : "absolute total delta"));
 
         printWrapped(logger, BOARD_PREFIX, "candidate band: ",
                 candidates.stream()
@@ -168,14 +175,13 @@ public final class NodeDebugPrinter {
                 lineCells.stream().map(cell -> cell.entry().costNodeId()).toList());
         double totalDifficulty = combinedEvaluation.totalScore();
         double averageDifficulty = totalDifficulty / lineCells.size();
-        double deltaFromTarget = totalDifficulty - difficulty.targetScore() * lineCells.size();
         log(logger, BOARD_PREFIX, "  line " + lineIndex + " | slots " + formatSlots(lineCells));
         printWrapped(logger, BOARD_PREFIX, "    cells: ",
                 lineCells.stream()
                         .map(cell -> cell.entry().id() + "(" + cell.effectiveDifficulty() + ")")
                         .toList());
-        log(logger, BOARD_PREFIX, "    combined score total/avg/delta: " + format(totalDifficulty) + " / "
-                + format(averageDifficulty) + " / " + format(deltaFromTarget));
+        log(logger, BOARD_PREFIX, "    combined score total/avg: " + format(totalDifficulty) + " / "
+                + format(averageDifficulty));
         printCountMap(logger, BOARD_PREFIX, "    aggregated resources:", combinedEvaluation.resourceCounts());
         printOperations(logger, BOARD_PREFIX, "    aggregated operations:", combinedEvaluation.operationCounts());
     }
