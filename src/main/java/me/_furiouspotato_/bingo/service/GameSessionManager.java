@@ -137,6 +137,10 @@ public final class GameSessionManager {
         return rules;
     }
 
+    public AspService asp() {
+        return aspService;
+    }
+
     public int elapsedSeconds() {
         return elapsedSeconds;
     }

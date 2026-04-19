@@ -57,7 +57,7 @@ public final class Main extends JavaPlugin {
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS,
                 event -> command.register(event.registrar()));
 
-        getServer().getPluginManager().registerEvents(new BingoGameplayListener(session), this);
+        getServer().getPluginManager().registerEvents(new BingoGameplayListener(this, session), this);
         getLogger().info("Team Bingo plugin enabled.");
     }
 

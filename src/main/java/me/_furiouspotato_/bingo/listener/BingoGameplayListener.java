@@ -1,5 +1,13 @@
 package me._furiouspotato_.bingo.listener;
 
+import me._furiouspotato_.bingo.service.GameSessionManager;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.levelgen.feature.EndPlatformFeature;
+import org.bukkit.*;
+import org.bukkit.advancement.Advancement;
+import org.bukkit.craftbukkit.CraftWorld;
+import org.bukkit.craftbukkit.entity.CraftEntity;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -9,27 +17,35 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
-import org.bukkit.event.inventory.FurnaceExtractEvent;
+import org.bukkit.event.entity.EntityPortalEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
+import org.bukkit.event.inventory.FurnaceExtractEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerItemHeldEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
-import org.bukkit.event.player.PlayerTeleportEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.*;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.jetbrains.annotations.Nullable;
 
-import me._furiouspotato_.bingo.service.GameSessionManager;
+import java.util.Objects;
 
 public final class BingoGameplayListener implements Listener {
+    private final JavaPlugin plugin;
     private final GameSessionManager session;
+    private final Advancement enterNetherAdvancement;
+    private final Advancement enterEndAdvancement;
 
-    public BingoGameplayListener(GameSessionManager session) {
+    public BingoGameplayListener(JavaPlugin plugin, GameSessionManager session) {
+        this.plugin = plugin;
         this.session = session;
+        this.enterNetherAdvancement = plugin.getServer().getAdvancement(NamespacedKey.minecraft("story/enter_the_nether"));
+        if (enterNetherAdvancement == null) {
+            plugin.getLogger().warning("story/enter_the_nether advancement not found");
+        }
+        this.enterEndAdvancement = plugin.getServer().getAdvancement(NamespacedKey.minecraft("story/enter_the_end"));
+        if (enterNetherAdvancement == null) {
+            plugin.getLogger().warning("story/enter_the_end advancement not found");
+        }
     }
 
     @EventHandler
@@ -235,5 +251,114 @@ public final class BingoGameplayListener implements Listener {
             return;
         }
         event.setCancelled(true);
+    }
+
+    @EventHandler
+    public void onRespawn(PlayerRespawnEvent event) {
+        final var baseWorldName = session.asp().currentWorldName();
+        if (!session.rules().useAsp() || baseWorldName == null) {
+            return;
+        }
+        final var player = event.getPlayer();
+        if (!player.getLocation().getWorld().getName().equals(baseWorldName + "_the_end")) {
+            return;
+        }
+        if (player.getRespawnLocation() != null && player.getRespawnLocation().getWorld().getName().equals(baseWorldName)) {
+            return;
+        }
+        if (event.getRespawnReason() == PlayerRespawnEvent.RespawnReason.END_PORTAL) {
+            event.setRespawnLocation(Objects.requireNonNull(Bukkit.getWorld(baseWorldName)).getSpawnLocation());
+        }
+    }
+
+    private void awardAdvancement(Player player, Advancement advancement) {
+        String criteria;
+        if (advancement == enterNetherAdvancement) {
+            criteria = "entered_nether";
+        } else if (advancement == enterEndAdvancement) {
+            criteria = "entered_end";
+        } else {
+            throw new RuntimeException("Invalid advancement passed: " + advancement);
+        }
+        if (advancement == null) {
+            return;
+        }
+        final var progress = player.getAdvancementProgress(advancement);
+        if (progress.isDone()) {
+            return;
+        }
+        if (!progress.awardCriteria(criteria)) {
+            plugin.getLogger().warning("Unable to award advancement criteria " + criteria + " to " + player.getName());
+        }
+    }
+
+    private @Nullable Location handlePortalCommon(Location fromLoc, PortalType portalType, Entity entity) {
+        final var baseWorldName = session.asp().currentWorldName();
+        if (!session.rules().useAsp() || baseWorldName == null) {
+            return null;
+        }
+        final var fromEnv = fromLoc.getWorld().getEnvironment();
+        var toLoc = fromLoc.clone();
+        if (portalType == PortalType.NETHER) {
+            if (fromEnv == World.Environment.NETHER) {
+                return new Location(
+                    Objects.requireNonNull(Bukkit.getWorld(baseWorldName)),
+                    fromLoc.getX() * 8,
+                    fromLoc.getY(),
+                    fromLoc.getZ() * 8
+                );
+            } else {
+                if (entity instanceof Player player) {
+                    awardAdvancement(player, enterNetherAdvancement);
+                }
+                return new Location(
+                    Objects.requireNonNull(Objects.requireNonNull(Bukkit.getWorld(baseWorldName + "_nether"))),
+                    fromLoc.getX() / 8,
+                    fromLoc.getY(),
+                    fromLoc.getZ() / 8
+                );
+            }
+        } else if (portalType == PortalType.ENDER) {
+            if (fromEnv == World.Environment.THE_END) {
+                // PlayerPortalEvent is not actually fired in this case,
+                // so this does nothing and teleportation is handled by PlayerRespawnEvent
+                return Objects.requireNonNull(Bukkit.getWorld(baseWorldName)).getSpawnLocation();
+            } else {
+                final var toWorld = Objects.requireNonNull(Bukkit.getWorld(baseWorldName + "_the_end"));
+                final var nativeWorld = ((CraftWorld) toLoc.getWorld()).getHandle();
+                final var nativeEntity = ((CraftEntity) entity).getHandle();
+                EndPlatformFeature.createEndPlatform(nativeWorld, new BlockPos(100, 49, 0), true, nativeEntity);
+                if (entity instanceof Player player) {
+                    awardAdvancement(player, enterEndAdvancement);
+                }
+                return new Location(toWorld, 100, 50, 0);
+            }
+        } else {
+            return null;
+        }
+    }
+
+    @EventHandler
+    public void onEntityPortal(EntityPortalEvent event) {
+        final var newLoc = handlePortalCommon(event.getFrom(), event.getPortalType(), event.getEntity());
+        if (newLoc != null) {
+            event.setTo(newLoc);
+        }
+    }
+
+    @EventHandler
+    public void onPlayerPortal(PlayerPortalEvent event) {
+        PortalType portalType;
+        if (event.getCause() == PlayerTeleportEvent.TeleportCause.END_PORTAL) {
+            portalType = PortalType.ENDER;
+        } else if (event.getCause() == PlayerTeleportEvent.TeleportCause.NETHER_PORTAL) {
+            portalType = PortalType.NETHER;
+        } else {
+            return;
+        }
+        final var newLoc = handlePortalCommon(event.getFrom(), portalType, event.getPlayer());
+        if (newLoc != null) {
+            event.setTo(newLoc);
+        }
     }
 }
