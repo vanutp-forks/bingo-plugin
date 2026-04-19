@@ -262,14 +262,14 @@ public final class GameSessionManager {
             }
             Player player = Bukkit.getPlayerExact(session.nickname());
             if (player != null && player.isOnline()) {
-                preparePlayerForRound(player);
                 player.teleport(new Location(arenaWorld, arenaX + 0.5, 221, arenaZ + 0.5));
+                preparePlayerForRound(player);
             }
         }
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (!isRoundParticipant(player.getName())) {
-                player.setGameMode(org.bukkit.GameMode.SPECTATOR);
                 player.teleport(new Location(arenaWorld, arenaX + 0.5, 255, arenaZ + 0.5));
+                player.setGameMode(org.bukkit.GameMode.SPECTATOR);
             }
         }
 
