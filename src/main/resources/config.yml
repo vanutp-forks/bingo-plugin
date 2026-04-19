@@ -22,6 +22,8 @@ show-global-score: true
 consume-on-claim: true
 # arena world name (fallback = first world)
 default-world-name: world
+# generate a temporary world for each game using Advanced Slime Paper (overrides default-world-name)
+use-asp: false
 # pregame countdown in seconds
 countdown-time: 10
 # death punishment duration in seconds

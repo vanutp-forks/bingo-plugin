@@ -53,6 +53,7 @@ public final class GameSessionManager {
     private final PlayerRoundPreparationService roundPreparationService;
     private final TeamManager teamManager;
     private final ScoreboardService scoreboardService;
+    private final AspService aspService;
 
     private final Map<String, PlayerSession> participants = new HashMap<>();
     private final Set<String> activeRoundPlayers = new HashSet<>();
@@ -96,6 +97,7 @@ public final class GameSessionManager {
         this.scoreboardService = scoreboardService;
         this.mode = rules.defaultMode();
         this.difficulty = rules.defaultDifficulty();
+        aspService = new AspService(plugin);
         forbiddenBiomes.add(Biome.OCEAN);
         forbiddenBiomes.add(Biome.COLD_OCEAN);
         forbiddenBiomes.add(Biome.DEEP_COLD_OCEAN);
@@ -871,16 +873,21 @@ public final class GameSessionManager {
     }
 
     private void selectArena() {
-        World world = Bukkit.getWorld(rules.defaultWorldName());
-        if (world == null) {
-            world = Bukkit.getWorlds().getFirst();
+        if (rules.useAsp()) {
+            arenaWorld = aspService.setupWorld();
+            arenaX = 0;
+            arenaZ = 0;
+        } else {
+            arenaWorld = Bukkit.getWorld(rules.defaultWorldName());
+            if (arenaWorld == null) {
+                arenaWorld = Bukkit.getWorlds().getFirst();
+            }
+            int[] coords = randomPlayableCoords(arenaWorld);
+            arenaX = coords[0];
+            arenaZ = coords[1];
         }
-        arenaWorld = world;
-        int[] coords = randomPlayableCoords(world);
-        arenaX = coords[0];
-        arenaZ = coords[1];
-        world.setTime(12000L);
-        world.setStorm(false);
+        arenaWorld.setTime(12000L);
+        arenaWorld.setStorm(false);
     }
 
     private int[] randomPlayableCoords(World world) {

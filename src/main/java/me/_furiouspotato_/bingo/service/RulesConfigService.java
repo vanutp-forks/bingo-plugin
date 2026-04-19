@@ -38,6 +38,7 @@ public final class RulesConfigService {
     private boolean consumeOnClaim = true;
     private String defaultWorldName = "world";
     private boolean printDebugInformation = false;
+    private boolean useAsp = false;
 
     public RulesConfigService(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -68,6 +69,7 @@ public final class RulesConfigService {
         showGlobalScore = cfg.getBoolean("show-global-score", true);
         consumeOnClaim = cfg.getBoolean("consume-on-claim", true);
         defaultWorldName = cfg.getString("default-world-name", "world");
+        useAsp = cfg.getBoolean("use-asp", false);
         boardClaimMode = parseClaimMode(cfg.getString("board-claim-mode", BoardClaimMode.AUTO.key()));
         printDebugInformation = cfg.getBoolean("print-debug-information",
                 cfg.getBoolean("debug-print-node-graph-on-startup", false));
@@ -181,6 +183,10 @@ public final class RulesConfigService {
 
     public String defaultWorldName() {
         return defaultWorldName;
+    }
+
+    public boolean useAsp() {
+        return useAsp;
     }
 
     public boolean printDebugInformation() {
