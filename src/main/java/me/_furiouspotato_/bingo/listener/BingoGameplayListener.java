@@ -10,6 +10,7 @@ import org.bukkit.craftbukkit.entity.CraftEntity;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
@@ -182,7 +183,15 @@ public final class BingoGameplayListener implements Listener {
             return;
         }
         event.setCancelled(true);
-        session.punishPlayerDeath(player);
+        session.punishPlayerDeath(player, event.getCause());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerMove(PlayerMoveEvent event) {
+        final var player = event.getPlayer();
+        if (player.isOnGround()) {
+            session.updateLastPlayerPos(player, player.getLocation());
+        }
     }
 
     @EventHandler

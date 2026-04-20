@@ -59,6 +59,7 @@ public final class GameSessionManager {
     private final Set<String> activeRoundPlayers = new HashSet<>();
     private final Map<String, Integer> globalPoints = new HashMap<>();
     private final Map<String, PunishmentState> punishments = new HashMap<>();
+    private final Map<String, Location> lastPlayerPositions = new HashMap<>();
 
     private Status status = Status.LOBBY;
     private GameMode mode;
@@ -157,6 +158,10 @@ public final class GameSessionManager {
         return activeRoundPlayers.contains(normalize(nickname));
     }
 
+    public boolean isParticipant(String nickname) {
+        return participants.containsKey(normalize(nickname));
+    }
+
     public List<TeamState> visibleTeams() {
         return hasActiveRoundPhase() ? roundActiveTeams() : teamManager.activeTeams();
     }
@@ -173,6 +178,13 @@ public final class GameSessionManager {
     public void setDifficulty(GameDifficulty difficulty) {
         this.difficulty = difficulty;
         rules.setDefaultDifficulty(difficulty);
+    }
+
+    public void updateLastPlayerPos(Player player, Location location) {
+        if (!isRunning() || !isRoundParticipant(player.getName())) {
+            return;
+        }
+        lastPlayerPositions.put(normalize(player.getName()), location);
     }
 
     public TeamColor joinPlayer(Player player, TeamColor requestedTeam) {
@@ -597,7 +609,7 @@ public final class GameSessionManager {
         return finalDamage >= player.getHealth();
     }
 
-    public void punishPlayerDeath(Player player) {
+    public void punishPlayerDeath(Player player, EntityDamageEvent.DamageCause cause) {
         if (!isRunning()) {
             return;
         }
@@ -631,6 +643,10 @@ public final class GameSessionManager {
                 Component.text("You died. Spectating for " + punishmentSeconds + "s.", NamedTextColor.RED));
 
         Location deathLocation = player.getLocation().clone();
+        if (cause == EntityDamageEvent.DamageCause.VOID) {
+            deathLocation = lastPlayerPositions.get(normalize(player.getName()));
+        }
+
         BukkitTask releaseTask = Bukkit.getScheduler().runTaskLater(plugin,
                 () -> clearPunishment(player.getName(), true),
                 Math.max(1, punishmentSeconds) * 20L);
